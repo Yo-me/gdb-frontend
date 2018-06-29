@@ -1,0 +1,29 @@
+SET(ProjectName gdb-frontend)
+
+PROJECT(${ProjectName} C CXX)
+
+CMAKE_MINIMUM_REQUIRED(VERSION 3.7)
+
+FILE(GLOB_RECURSE sources
+    ${CMAKE_SOURCE_DIR}/src/*.c
+    ${CMAKE_SOURCE_DIR}/src/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/*.h
+    ${CMAKE_SOURCE_DIR}/src/*.hpp
+)
+
+INCLUDE_DIRECTORIES(
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/imgui
+    ${CMAKE_SOURCE_DIR}/deps/GLFW/include
+    )
+
+FIND_PACKAGE(OPENGL REQUIRED)
+
+FIND_LIBRARY(GLFW NAMES libglfw3.a glfw3 PATHS ${CMAKE_SOURCE_DIR}/deps/GLFW/lib)
+
+ADD_EXECUTABLE(${ProjectName} ${sources})
+
+TARGET_LINK_LIBRARIES(${ProjectName}
+    ${GLFW}
+    ${OPENGL_gl_LIBRARY}
+)
