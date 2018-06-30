@@ -43,6 +43,13 @@ bool GDB::sendCLI(const std::string &command)
     return this->checkResultDone();
 }
 
+void GDB::poll(void)
+{
+   GDBOutput *rsp = this->getResponse();
+   if(rsp)
+      this->freeOutput(rsp);
+}
+
 GDBOutput *GDB::getResponse()
 {
     GDBOutput *ret = NULL;

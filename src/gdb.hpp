@@ -77,6 +77,7 @@ class GDB
         GDBOutput *getResponse();
         GDBOutput *getResponseBlk();
         bool sendCLI(const std::string &command);
+        void poll(void);
 
     protected:
         virtual bool send(const std::string &message) = 0;

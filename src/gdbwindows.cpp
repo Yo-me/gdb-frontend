@@ -114,21 +114,23 @@ bool GDBWindows::readline(std::string &message)
     do
     {
         success = ReadFile(this->m_fromGDB, &c, 1, &length, NULL);
-
-        if(c == '\n')
+        if(success)
         {
-            return true;
+            if(c == '\n')
+            {
+                return true;
+            }
+            else if(c != '\r')
+            {
+                message.append(&c, 1);
+            }
         }
-        else if(c != '\r')
-        {
-            message.append(&c, 1);
-        }
-    } while(success && length > 0);
+    } while(success);
 
     if(message.length() > 0)
         std::cout << "Received from gdb : " << message << std::endl;
 
-    return false;
+    return success;
 }
 
 bool GDBWindows::send(const std::string &message)

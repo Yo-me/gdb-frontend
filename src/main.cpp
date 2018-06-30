@@ -70,10 +70,11 @@ int main(int argc, char **argv)
     if (!glfwInit())
         return -1;
 
-    window = glfwCreateWindow(800, 600, "Viewer", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "GDB-frontend", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
+	std::cout << "Error initializing glfw" << std::endl;
         return -1;
     }
 
@@ -101,17 +102,19 @@ int main(int argc, char **argv)
     glfwSetCharCallback(window, character_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
 
-    GDBWindows gdb(dynamic_cast<std::ostream&>(consoleStream), "O:/mingw32_6.3.0/bin/gdb.exe");
+    GDBWindows gdb(dynamic_cast<std::ostream&>(consoleStream));
 
     if(!gdb.connect())
     {
         exit(1);
+	std::cout << "Error connecting to gdb" << std::endl;
     }
 
     //    delete gdb.getResponseBlk();
 
     while (!glfwWindowShouldClose(window))
     {
+	gdb.poll();
         /* Render ImgUI windows */
         {
             int display_w, display_h;
@@ -130,7 +133,7 @@ int main(int argc, char **argv)
                 ImGui::Separator();
                 if (ImGui::InputText("Input", command, IM_ARRAYSIZE(command), ImGuiInputTextFlags_EnterReturnsTrue))
                 {
-                    command[strlen(command-1)] = '\0';
+                    //command[strlen(command)-1] = '\0';
                     gdb.sendCLI(command);
                     std::cout << command << std::endl;
                     command[0] = 0;
