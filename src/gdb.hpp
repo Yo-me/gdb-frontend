@@ -3,6 +3,8 @@
 
 #include <string>
 #include <ostream>
+#include <vector>
+#include <map>
 
 typedef enum
 {
@@ -51,7 +53,15 @@ typedef struct GDBResult
     GDB_VALUE_TYPE vt;
 
     std::string cstr;
-    struct GDBResult *rs;
+    std::vector<struct GDBResult *> vec;
+    std::map<std::string, struct GDBResult *> mp;
+    struct GDBResult *next;
+
+    bool operator==(const std::string &str) const
+    {
+        return str == (this->var);
+    }
+
 } GDBResult;
 
 typedef struct GDBOutput
@@ -61,15 +71,70 @@ typedef struct GDBOutput
     GDB_MESSAGE_SUBSUBTYPE sst;
     GDB_MESSAGE_CLASS cl;
 
-    GDBResult rs;
+    std::vector<GDBResult *> rs;
 
     struct GDBOutput *next;
 } GDBOutput;
+
+typedef enum
+{
+    GDB_STOP_REASON_UNKNOWN = 0,
+    GDB_STOP_REASON_BP_HIT,
+    GDB_STOP_REASON_WP_TRIGGER,
+    GDB_STOP_REASON_READ_WP_TRIGGER,
+    GDB_STOP_REASON_ACCESS_WP_TRIGGER,
+    GDB_STOP_REASON_WP_SCOPE,
+    GDB_STOP_REASON_FUNC_FINISHED,
+    GDB_STOP_REASON_LOCATION_REACHED,
+    GDB_STOP_REASON_END_STEPPING,
+    GDB_STOP_REASON_EXITED_SIGNALLED,
+    GDB_STOP_REASON_EXITED,
+    GDB_STOP_REASON_EXITED_NORMALLY,
+    GDB_STOP_REASON_SIGNAL_RECEIVED
+} GDB_STOP_REASON;
+
+typedef struct
+{
+    int level;
+    void *addr;
+    std::string func;
+    std::string file;
+    std::string fullname;
+    int line;
+    GDBResult *args;
+
+} GDBFrame;
+
+typedef struct GDBStopResult
+{
+    GDB_STOP_REASON reason;
+    bool hasThreadId;
+    bool hasBkptNo;
+    bool hasExitCode;
+    bool hasWpNo;
+
+    int threadId;
+    GDBFrame *frame;
+
+    int bkptNo;
+
+    /* TODO handle rest of stop reasons */
+
+} GDBStopResult;
+
+
+typedef enum
+{
+    GDB_STATE_RUNNING = 0,
+    GDB_STATE_STOPPED
+} GDBState;
 
 class GDB
 {
     private:
         std::ostream &m_consoleStream;
+        GDBState m_state;
+        std::string m_currentFile;
     public:
         GDB(std::ostream &consoleStream);
 
@@ -85,13 +150,21 @@ class GDB
     private:
         GDBOutput *parseOutput(std::string &str);
         void parseResultRecord(GDBOutput *o, std::string &str);
+        void parseExecAsyncRecord(GDBOutput *o, std::string &str);
+        void parseAsyncRecord(GDBOutput *o, std::string &str);
         void parseConsoleStreamOutput(GDBOutput *o, std::string &str);
         void parseConsoleOutput(GDBOutput *o, std::string &str);
-        void parseString(GDBOutput *o, std::string &str);
+        void parseString(GDBResult *o, std::string &str);
+        void parseTuple(GDBResult *o, std::string &str);
+        void parseList(GDBResult *o, std::string &str);
         GDBOutput *getResultRecord(GDBOutput *o);
+        GDBStopResult *getStopResult(GDBOutput *o);
         bool checkResult(GDB_MESSAGE_CLASS c);
         void freeOutput(GDBOutput *o);
+        void freeResult(GDBResult *res);
         bool checkResultDone();
+        void parseResults(GDBOutput *o, std::string &str);
+        GDBResult *parseResult(std::string &str);
 };
 
 #endif

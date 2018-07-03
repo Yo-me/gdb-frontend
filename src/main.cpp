@@ -112,6 +112,7 @@ int main(int argc, char **argv)
 
     //    delete gdb.getResponseBlk();
 
+    bool scroll = false;
     while (!glfwWindowShouldClose(window))
     {
 	gdb.poll();
@@ -129,15 +130,22 @@ int main(int argc, char **argv)
                 bool reclaim_focus = false;
                 ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar); // Leave room for 1 separator + 1 InputText
                 ImGui::TextUnformatted(consoleStream.str().c_str());
+                if(scroll)
+                {
+                    ImGui::SetScrollHere(0.99);
+                    scroll = false;
+                }
                 ImGui::EndChild();
                 ImGui::Separator();
                 if (ImGui::InputText("Input", command, IM_ARRAYSIZE(command), ImGuiInputTextFlags_EnterReturnsTrue))
                 {
                     //command[strlen(command)-1] = '\0';
+                    consoleStream << "(gdb) " << command << std::endl;
                     gdb.sendCLI(command);
                     std::cout << command << std::endl;
                     command[0] = 0;
                     reclaim_focus = true;
+                    scroll = true;
                 }
                 // Demonstrate keeping focus on the input box
                 ImGui::SetItemDefaultFocus();
