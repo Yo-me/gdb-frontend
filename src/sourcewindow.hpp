@@ -13,6 +13,7 @@ class SourceWindow
         GDB *m_gdb;
         std::string m_currentFileName;
         std::stringstream m_currentFileContent;
+        int m_currentSourceLine;
 
     public:
         SourceWindow(GDB *gdb);

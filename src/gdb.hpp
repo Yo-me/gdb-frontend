@@ -167,7 +167,7 @@ class GDB
         void freeResult(GDBResult *res);
         bool checkResultDone();
         void parseResults(GDBOutput *o, std::string &str);
-        GDBResult *parseResult(std::string &str);
+        GDBResult *parseResult(std::string &str, GDBResult *pres = NULL);
 };
 
 #endif

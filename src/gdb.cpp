@@ -107,20 +107,23 @@ GDBOutput *GDB::getResponse()
         {
             std::cout << output << std::endl;
             o = this->parseOutput(output);
-            if(o->t == GDB_TYPE_OUT_OF_BAND && o->st == GDB_SUBTYPE_STREAM)
-            {
-                add = false;
-                switch(o->sst)
+            if(o)
+                if(o->t == GDB_TYPE_OUT_OF_BAND && o->st == GDB_SUBTYPE_STREAM)
                 {
-                    case GDB_SUBSUBTYPE_CONSOLE:
-                        this->m_consoleStream << o->rs[0]->cstr;
-                        break;
+                    add = false;
+                    switch(o->sst)
+                    {
+                        case GDB_SUBSUBTYPE_CONSOLE:
+                            this->m_consoleStream << o->rs[0]->cstr;
+                            break;
+                    }
                 }
-            }
-            else
-            {
+                else
+                {
 
-            }
+                }
+            else
+                add = false;
 
             if(add)
             {
@@ -173,7 +176,7 @@ GDBOutput *GDB::parseOutput(std::string &str)
         char first = str[0];
         o->next = NULL;
         str.erase(0, 1);
-        if(first == '&' || first == '~' || first == '=')
+        if(first == '&' || first == '~')
         {
             this->parseConsoleStreamOutput(o, str);
         }
@@ -604,7 +607,7 @@ void GDB::parseResults(GDBOutput *o, std::string &str)
 
 }
 
-GDBResult *GDB::parseResult(std::string &str)
+GDBResult *GDB::parseResult(std::string &str, GDBResult *pres)
 {
     char first;
     GDBResult *res = NULL;
@@ -614,7 +617,10 @@ GDBResult *GDB::parseResult(std::string &str)
         if(str[0] == ',')
             str.erase(0, 1);
         {
-            res = new GDBResult();
+            if(pres)
+                res = pres;
+            else
+                res = new GDBResult();
             if(res)
             {
                 if(str[0] == '\"')
@@ -623,33 +629,28 @@ GDBResult *GDB::parseResult(std::string &str)
                 }
                 else if(str[0])
                 {
-                    endPos = str.find('=');
-
-                    if(endPos == std::string::npos)
-                        return NULL;
-                    res->var = str.substr(0, endPos);
-                    str.erase(0, endPos+1 /* +1 to erase the = sign */ );
-                    if((first = str[0]) != '\0')
+                    first = str[0];
+                    if(first == '[')
                     {
-                        if(first == '[')
-                        {
-                            this->parseList(res, str);
-                        }
-                        else if(first == '{')
-                        {
-                            this->parseTuple(res, str);
-                        }
-                        else if(first == '\"')
-                        {
-                            this->parseString(res, str);
-                        }
-                        else
-                        {
-                            /* TODO Handle Error */
-                        }
+                        this->parseList(res, str);
+                    }
+                    else if(first == '{')
+                    {
+                        this->parseTuple(res, str);
+                    }
+                    else if(first == '\"')
+                    {
+                        this->parseString(res, str);
                     }
                     else
                     {
+                        endPos = str.find('=');
+
+                        if(endPos == std::string::npos)
+                            return NULL;
+                        res->var = str.substr(0, endPos);
+                        str.erase(0, endPos+1 /* +1 to erase the = sign */ );
+                        this->parseResult(str, res);
                     }
                 }
             }
