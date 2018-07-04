@@ -8,6 +8,7 @@
 #include "imgui_impl_glfw_gl3.h"
 
 #include "gdbwindows.hpp"
+#include "GDBConsole.hpp"
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -108,129 +109,86 @@ int main(int argc, char **argv)
     if(!gdb.connect())
     {
         exit(1);
-	std::cout << "Error connecting to gdb" << std::endl;
+        std::cout << "Error connecting to gdb" << std::endl;
     }
-
-    //    delete gdb.getResponseBlk();
-
-    bool scroll = false;
-    while (!glfwWindowShouldClose(window))
     {
-	gdb.poll();
-        /* Render ImgUI windows */
+        GDBConsole console(&gdb, consoleStream);
+        while (!glfwWindowShouldClose(window))
         {
-            int display_w, display_h;
-            bool displayWindow = true;
-
-            ImGui_ImplGlfwGL3_NewFrame();
-
-
-            /* Console */
-            if(ImGui::Begin("Console"))
+            gdb.poll();
+            /* Render ImgUI windows */
             {
-                const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing(); // 1 separator, 1 input text
-                char command[1024] = "\0";
-                bool reclaim_focus = false;
-                ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar); // Leave room for 1 separator + 1 InputText
-                ImGui::TextUnformatted(consoleStream.str().c_str());
-                if(scroll)
-                {
-                    ImGui::SetScrollHere(0.99);
-                    scroll = false;
-                }
-                ImGui::EndChild();
-                ImGui::Separator();
-                if (ImGui::InputText("Input", command, IM_ARRAYSIZE(command), ImGuiInputTextFlags_EnterReturnsTrue))
-                {
-                    //command[strlen(command)-1] = '\0';
-                    consoleStream << "(gdb) " << command << std::endl;
-                    gdb.sendCLI(command);
-                    std::cout << command << std::endl;
-                    command[0] = 0;
-                    reclaim_focus = true;
-                    scroll = true;
-                }
-                // Demonstrate keeping focus on the input box
-                ImGui::SetItemDefaultFocus();
-                if (reclaim_focus)
-                    ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
-            }
-            ImGui::End();
-            /* Source File */
-            if(ImGui::Begin("Source File"))
-            {
-                ImVec2 pos = ImGui::GetCursorScreenPos();
-               static std::string currentFile;
-               static std::stringstream filestream;
-               static int currentSourceLine = -1;
-               if(currentFile != gdb.getCurrentFilePath())
-               {
-                   filestream.str("");
-                   currentFile = gdb.getCurrentFilePath();
-                   std::ifstream f(currentFile);
-                   if(!f.fail())
-                   {
-                        filestream << f.rdbuf();
-                   }
-                   else
-                   {
-                       filestream << "Unable to open file " << currentFile;
-                   }
-               }
-               ImGui::InputTextMultiline("##Source", (char *)filestream.str().c_str(), filestream.str().length(), ImVec2(-1.0f, -1.0f));
-               {
-                   currentSourceLine = gdb.getCurrentSourceLine() - 1;
-                   if(currentSourceLine != -1)
-                   {
-                       ImGui::BeginChild(ImGui::GetID("##Source"), ImVec2(-1.0, -1.0));
-                       {
-                           float scrollY = ImGui::GetScrollY();
-                           float spacing = ImGui::GetTextLineHeight();
+                int display_w, display_h;
+                bool displayWindow = true;
 
-                           float lineStartY = currentSourceLine * spacing + ImGui::GetStyle().ItemSpacing.y;
+                ImGui_ImplGlfwGL3_NewFrame();
 
-                           float lineEndY = ImGui::GetTextLineHeight();
-                           ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x, pos.y + lineStartY - scrollY), ImVec2(pos.x + ImGui::GetWindowContentRegionWidth() + ImGui::GetStyle().ItemSpacing.x, pos.y + lineStartY + lineEndY - scrollY), IM_COL32(255, 255, 255, 64));
-                       }
-                       ImGui::EndChild();
-                   }
-               }
-            }
-            ImGui::End();
+
+                /* Console */
+                console.draw();
+                /* Source File */
+                if(ImGui::Begin("Source File"))
+                {
+                    ImVec2 pos = ImGui::GetCursorScreenPos();
+                    static std::string currentFile;
+                    static std::stringstream filestream;
+                    static int currentSourceLine = -1;
+                    if(currentFile != gdb.getCurrentFilePath())
+                    {
+                        filestream.str("");
+                        currentFile = gdb.getCurrentFilePath();
+                        std::ifstream f(currentFile);
+                        if(!f.fail())
+                        {
+                            filestream << f.rdbuf();
+                        }
+                        else
+                        {
+                            filestream << "Unable to open file " << currentFile;
+                        }
+                    }
+                    ImGui::InputTextMultiline("##Source", (char *)filestream.str().c_str(), filestream.str().length(), ImVec2(-1.0f, -1.0f));
+                    {
+                        currentSourceLine = gdb.getCurrentSourceLine() - 1;
+                        if(currentSourceLine != -1)
+                        {
+                            ImGui::BeginChild(ImGui::GetID("##Source"), ImVec2(-1.0, -1.0));
+                            {
+                                float scrollY = ImGui::GetScrollY();
+                                float spacing = ImGui::GetTextLineHeight();
+
+                                float lineStartY = currentSourceLine * spacing + ImGui::GetStyle().ItemSpacing.y;
+
+                                float lineEndY = ImGui::GetTextLineHeight();
+                                ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x, pos.y + lineStartY - scrollY), ImVec2(pos.x + ImGui::GetWindowContentRegionWidth() + ImGui::GetStyle().ItemSpacing.x, pos.y + lineStartY + lineEndY - scrollY), IM_COL32(255, 255, 255, 64));
+                            }
+                            ImGui::EndChild();
+                        }
+                    }
+                }
+                ImGui::End();
 
 
 
 #if 1
-            ImGui::ShowMetricsWindow();
-            ImGui::ShowDemoWindow(&displayWindow);
+                ImGui::ShowMetricsWindow();
+                ImGui::ShowDemoWindow(&displayWindow);
 #endif
-            glfwGetFramebufferSize(window, &display_w, &display_h);
-            glViewport(0, 0, display_w, display_h);
-            glClearColor(0.0, 0.0, 0.0, 1.0);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            ImGui::Render();
-            ImGui_ImplGlfwGL3_RenderDrawData(ImGui::GetDrawData());
+                glfwGetFramebufferSize(window, &display_w, &display_h);
+                glViewport(0, 0, display_w, display_h);
+                glClearColor(0.0, 0.0, 0.0, 1.0);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                ImGui::Render();
+                ImGui_ImplGlfwGL3_RenderDrawData(ImGui::GetDrawData());
+            }
+
+            /* Swap front and back buffers */
+            glfwSwapBuffers(window);
+
+            /* Poll for and process events */
+            glfwPollEvents();
         }
-
-        /* Swap front and back buffers */
-        glfwSwapBuffers(window);
-
-        /* Poll for and process events */
-        glfwPollEvents();
     }
-#if 0
-    std::cout << message;
-    //gdb.setExeFile("O:/mingw32_6.3.0/bin/gdb.exe");
-    if(!gdb.sendCLI("help"))
-    {
-        std::cerr << "Error sending CLI command" << std::endl;
-    }
-
-    std::cout << consoleStream.str() << std::endl;
-
-    getchar();
-#endif
-
 
     return 0;
 }
