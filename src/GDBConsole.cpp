@@ -1,4 +1,4 @@
-#include "GDBConsole.hpp"
+#include "gdbconsole.hpp"
 
 #include "imgui.h"
 
