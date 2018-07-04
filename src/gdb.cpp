@@ -18,8 +18,20 @@ static void replaceAll(std::string& str, const std::string& from, const std::str
 GDB::GDB(std::ostream &consoleStream):
     m_consoleStream(consoleStream),
     m_state(GDB_STATE_STOPPED),
-    m_currentFile("")
-{}
+    m_currentFile(""),
+    m_currentSourceLine(-1)
+{
+}
+
+std::string GDB::getCurrentFilePath()
+{
+    return this->m_currentFile;
+}
+
+int GDB::getCurrentSourceLine()
+{
+    return this->m_currentSourceLine;
+}
 
 bool GDB::setExeFile(const std::string &filename)
 {
@@ -63,6 +75,12 @@ void GDB::poll(void)
                 if(s->frame)
                 {
                     this->m_currentFile = s->frame->fullname;
+                    this->m_currentSourceLine = s->frame->line;
+                }
+                else
+                {
+                    this->m_currentFile = "";
+                    this->m_currentSourceLine = -1;
                 }
             }
             delete(s->frame);
@@ -366,9 +384,18 @@ GDBStopResult *GDB::getStopResult(GDBOutput *o)
                 {
                     res->frame = new GDBFrame();
                     res->frame->func = tmp->mp["func"]->cstr;
-                    res->frame->file = tmp->mp["file"]->cstr;
-                    res->frame->fullname = tmp->mp["fullname"]->cstr;
-                    res->frame->line = stoi(tmp->mp["line"]->cstr);
+                    if(tmp->mp["file"])
+                        res->frame->file = tmp->mp["file"]->cstr;
+                    else
+                        res->frame->file = "";
+                    if(tmp->mp["fullname"])
+                        res->frame->fullname = tmp->mp["fullname"]->cstr;
+                    else
+                        res->frame->fullname = "";
+                    if(tmp->mp["line"])
+                        res->frame->line = stoi(tmp->mp["line"]->cstr);
+                    else
+                        res->frame->line = -1;
                     res->frame->addr = (void *)stoul(tmp->mp["addr"]->cstr);
                 }
                 else
@@ -440,7 +467,9 @@ void GDB::freeResult(GDBResult *res)
         case GDB_VALUE_TYPE_TUPLE:
             for(std::map<std::string, GDBResult*>::iterator it = res->mp.begin(); it != res->mp.end(); it++)
             {
-                this->freeResult(it->second);
+                std::cout << "Freeing " << it->first << std::endl;
+                if(it->second)
+                    this->freeResult(it->second);
             }
             break;
     }

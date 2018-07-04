@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -123,6 +124,8 @@ int main(int argc, char **argv)
 
             ImGui_ImplGlfwGL3_NewFrame();
 
+
+            /* Console */
             if(ImGui::Begin("Console"))
             {
                 const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing(); // 1 separator, 1 input text
@@ -153,10 +156,52 @@ int main(int argc, char **argv)
                     ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
             }
             ImGui::End();
+            /* Source File */
+            if(ImGui::Begin("Source File"))
+            {
+                ImVec2 pos = ImGui::GetCursorScreenPos();
+               static std::string currentFile;
+               static std::stringstream filestream;
+               static int currentSourceLine = -1;
+               if(currentFile != gdb.getCurrentFilePath())
+               {
+                   filestream.str("");
+                   currentFile = gdb.getCurrentFilePath();
+                   std::ifstream f(currentFile);
+                   if(!f.fail())
+                   {
+                        filestream << f.rdbuf();
+                   }
+                   else
+                   {
+                       filestream << "Unable to open file " << currentFile;
+                   }
+               }
+               ImGui::InputTextMultiline("##Source", (char *)filestream.str().c_str(), filestream.str().length(), ImVec2(-1.0f, -1.0f));
+               {
+                   currentSourceLine = gdb.getCurrentSourceLine() - 1;
+                   if(currentSourceLine != -1)
+                   {
+                       ImGui::BeginChild(ImGui::GetID("##Source"), ImVec2(-1.0, -1.0));
+                       {
+                           float scrollY = ImGui::GetScrollY();
+                           float spacing = ImGui::GetTextLineHeight();
+
+                           float lineStartY = currentSourceLine * spacing + ImGui::GetStyle().ItemSpacing.y;
+
+                           float lineEndY = ImGui::GetTextLineHeight();
+                           ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x, pos.y + lineStartY - scrollY), ImVec2(pos.x + ImGui::GetWindowContentRegionWidth() + ImGui::GetStyle().ItemSpacing.x, pos.y + lineStartY + lineEndY - scrollY), IM_COL32(255, 255, 255, 64));
+                       }
+                       ImGui::EndChild();
+                   }
+               }
+            }
+            ImGui::End();
 
 
 
 #if 1
+            ImGui::ShowMetricsWindow();
             ImGui::ShowDemoWindow(&displayWindow);
 #endif
             glfwGetFramebufferSize(window, &display_w, &display_h);

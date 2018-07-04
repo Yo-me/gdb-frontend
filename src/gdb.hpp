@@ -135,6 +135,7 @@ class GDB
         std::ostream &m_consoleStream;
         GDBState m_state;
         std::string m_currentFile;
+        int m_currentSourceLine;
     public:
         GDB(std::ostream &consoleStream);
 
@@ -143,6 +144,8 @@ class GDB
         GDBOutput *getResponseBlk();
         bool sendCLI(const std::string &command);
         void poll(void);
+        std::string getCurrentFilePath();
+        int getCurrentSourceLine();
 
     protected:
         virtual bool send(const std::string &message) = 0;

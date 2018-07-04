@@ -6,7 +6,6 @@
 GDBWindows::GDBWindows(std::ostream &consoleStream, std::string path)
 : GDB(consoleStream), m_path(path)
 {
-
 }
 
 
@@ -53,7 +52,7 @@ bool GDBWindows::connect()
         return false;
     }
 
-    if(!CreateNamedPipe((LPCSTR)consolePipeName.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_NOWAIT, PIPE_UNLIMITED_INSTANCES, 8*1024, 8*1024, 0, NULL))
+    if(!(this->m_appPipe = CreateNamedPipe((LPCSTR)consolePipeName.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_NOWAIT, PIPE_UNLIMITED_INSTANCES, 8*1024, 8*1024, 0, NULL)))
     {
         std::cerr << "Error creating console named pipe" << std::endl;
         return false;
@@ -101,6 +100,7 @@ bool GDBWindows::connect()
         /* TODO : Find a better solution */
         Sleep(1000);
     }
+    this->sendCLI("set new-console on");
 
     return true;
 }
@@ -108,8 +108,16 @@ bool GDBWindows::connect()
 bool GDBWindows::readline(std::string &message)
 {
     char c;
+    char buffer[1025];
     DWORD length = 0;
     BOOL success;
+
+    success = ReadFile(this->m_appPipe, buffer, 1024, &length, NULL);
+    if(success)
+    {
+        buffer[length] = 0;
+        std::cout << "APPCONSOLE : " << buffer << std::endl;
+    }
 
     do
     {
