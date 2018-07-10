@@ -117,7 +117,7 @@ int main(int argc, char **argv)
         GDBConsole console(&gdb, consoleStream);
         SourceWindow srcWindow(&gdb);
         BreakpointWindow bpWindow(&gdb);
-        while (!glfwWindowShouldClose(window))
+        while (!glfwWindowShouldClose(window) && gdb.getState() != GDB_STATE_EXITED)
         {
             gdb.poll();
             /* Render ImgUI windows */

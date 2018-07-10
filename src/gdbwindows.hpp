@@ -14,12 +14,14 @@ class GDBWindows : public GDB
         HANDLE m_fromGDB;
         HANDLE m_consolePipe;
         HANDLE m_appPipe;
+        HANDLE m_processHandle;
 
     public:
         GDBWindows(std::ostream &consoleOutputStream, std::string path = "gdb.exe");
         bool connect();
         bool readline(std::string &message);
         bool send(const std::string &message);
+        bool gdbProcessRunning();
 };
 
 #endif

@@ -34,6 +34,11 @@ GDB::GDB(std::ostream &consoleStream):
 {
 }
 
+GDBState GDB::getState()
+{
+    return this->m_state;
+}
+
 std::string GDB::getCurrentFilePath()
 {
     return this->m_currentFile;
@@ -98,6 +103,10 @@ void GDB::poll(void)
             delete(s);
         }
         this->freeOutput(rsp);
+    }
+    else if(!this->gdbProcessRunning())
+    {
+        this->m_state = GDB_STATE_EXITED;
     }
 }
 
@@ -183,7 +192,7 @@ GDBOutput *GDB::getResponseBlk()
     do
     {
         o = this->getResponse();
-    } while(!o);
+    } while(!o && this->gdbProcessRunning());
 
     return o;
 }

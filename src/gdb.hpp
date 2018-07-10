@@ -130,7 +130,8 @@ typedef struct GDBStopResult
 typedef enum
 {
     GDB_STATE_RUNNING = 0,
-    GDB_STATE_STOPPED
+    GDB_STATE_STOPPED,
+    GDB_STATE_EXITED
 } GDBState;
 
 
@@ -168,6 +169,7 @@ class GDB
         void poll(void);
         std::string getCurrentFilePath();
         int getCurrentSourceLine();
+        GDBState getState();
 
         const std::vector<GDBBreakpoint *> &getBreakpoints(void);
         void setBreakpointState(std::string bp, bool state);
@@ -175,6 +177,7 @@ class GDB
     protected:
         virtual bool send(const std::string &message) = 0;
         virtual bool readline(std::string &message) = 0;
+        virtual bool gdbProcessRunning() = 0;
     private:
         GDBOutput *parseOutput(std::string &str);
         void parseResultRecord(GDBOutput *o, std::string &str);

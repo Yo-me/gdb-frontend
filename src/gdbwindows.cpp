@@ -97,6 +97,7 @@ bool GDBWindows::connect()
     }
     else
     {
+        this->m_processHandle = piProcInfo.hProcess;
         /* TODO : Find a better solution */
         Sleep(1000);
     }
@@ -152,4 +153,24 @@ bool GDBWindows::send(const std::string &message)
 
     std::cout << ((success && length > 0) ? "Success " : "Failed ") << GetLastError() << std::endl;
     return (success && length > 0);
+}
+
+bool GDBWindows::gdbProcessRunning()
+{
+    BOOL result;
+    DWORD exitCode;
+
+    if(GetExitCodeProcess(this->m_processHandle, &exitCode))
+    {
+        if(exitCode == STILL_ACTIVE)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    return false;
 }
