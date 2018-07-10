@@ -5,7 +5,8 @@
 #include <GLFW/glfw3.h>
 
 #include "imgui.h"
-#include "imgui_impl_glfw_gl3.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
 #include "gdbwindows.hpp"
 #include "gdbconsole.hpp"
@@ -89,8 +90,8 @@ int main(int argc, char **argv)
 
     /* Setup imgui */
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui_ImplGlfwGL3_Init(window, false);
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init();
     // Setup style
     {
         ImGuiStyle &style = ImGui::GetStyle();
@@ -125,7 +126,9 @@ int main(int argc, char **argv)
                 int display_w, display_h;
                 bool displayWindow = true;
 
-                ImGui_ImplGlfwGL3_NewFrame();
+                ImGui_ImplOpenGL3_NewFrame();
+                ImGui_ImplGlfw_NewFrame();
+                ImGui::NewFrame();
 
 
 
@@ -141,12 +144,12 @@ int main(int argc, char **argv)
                 ImGui::ShowMetricsWindow();
                 ImGui::ShowDemoWindow(&displayWindow);
 #endif
+                ImGui::Render();
                 glfwGetFramebufferSize(window, &display_w, &display_h);
                 glViewport(0, 0, display_w, display_h);
                 glClearColor(0.0, 0.0, 0.0, 1.0);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                ImGui::Render();
-                ImGui_ImplGlfwGL3_RenderDrawData(ImGui::GetDrawData());
+                ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
             }
 
             /* Swap front and back buffers */

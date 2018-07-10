@@ -10,7 +10,7 @@ class GDBConsole
     private:
         GDB *m_gdb;
         std::ostringstream &m_stream;
-        bool m_scrollToBottom;
+        int m_scrollToBottom;
     public:
         GDBConsole(GDB *gdb, std::ostringstream &stream);
         void draw(void);
