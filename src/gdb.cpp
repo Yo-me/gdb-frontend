@@ -15,6 +15,17 @@ static void replaceAll(std::string& str, const std::string& from, const std::str
     }
 }
 
+static GDBResult *findResult(GDBOutput *o, const std::string &name)
+{
+    for(std::vector<GDBResult *>::iterator it = o->rs.begin(); it != o->rs.end(); it++)
+    {
+        if((*it)->var == name)
+            return *it;
+    }
+
+    return NULL;
+}
+
 GDB::GDB(std::ostream &consoleStream):
     m_consoleStream(consoleStream),
     m_state(GDB_STATE_STOPPED),
@@ -108,6 +119,7 @@ GDBOutput *GDB::getResponse()
             std::cout << output << std::endl;
             o = this->parseOutput(output);
             if(o)
+            {
                 if(o->t == GDB_TYPE_OUT_OF_BAND && o->st == GDB_SUBTYPE_STREAM)
                 {
                     add = false;
@@ -118,12 +130,25 @@ GDBOutput *GDB::getResponse()
                             break;
                     }
                 }
+                else if(o->t == GDB_TYPE_OUT_OF_BAND && o->st == GDB_SUBTYPE_ASYNC && (o->cl == GDB_CLASS_BP_ADDED || o->cl == GDB_CLASS_BP_MODIFIED))
+                {
+                    add = false;
+                    this->addOrUpdateBreakpoint(o);
+                }
+                else if(o->t == GDB_TYPE_OUT_OF_BAND && o->st == GDB_SUBTYPE_ASYNC && o->cl == GDB_CLASS_BP_DELETED)
+                {
+                    add = false;
+                    this->deleteBreakpoint(o);
+                }
                 else
                 {
 
                 }
+            }
             else
+            {
                 add = false;
+            }
 
             if(add)
             {
@@ -188,6 +213,10 @@ GDBOutput *GDB::parseOutput(std::string &str)
         {
             this->parseExecAsyncRecord(o, str);
         }
+        else if(first == '=')
+        {
+            this->parseNotifyAsyncRecord(o, str);
+        }
         else
         {
         }
@@ -198,6 +227,12 @@ GDBOutput *GDB::parseOutput(std::string &str)
 void GDB::parseExecAsyncRecord(GDBOutput *o, std::string &str)
 {
     o->sst = GDB_SUBSUBTYPE_EXEC;
+    this->parseAsyncRecord(o, str);
+}
+
+void GDB::parseNotifyAsyncRecord(GDBOutput *o, std::string &str)
+{
+    o->sst = GDB_SUBSUBTYPE_NOTIFY;
     this->parseAsyncRecord(o, str);
 }
 
@@ -214,6 +249,24 @@ void GDB::parseAsyncRecord(GDBOutput *o, std::string &str)
     {
         o->cl = GDB_CLASS_STOPPED;
         str.erase(0, 7);
+        this->parseResults(o, str);
+    }
+    else if(!str.compare(0, 18, "breakpoint-created"))
+    {
+        o->cl = GDB_CLASS_BP_ADDED;
+        str.erase(0, 18);
+        this->parseResults(o, str);
+    }
+    else if(!str.compare(0, 19, "breakpoint-modified"))
+    {
+        o->cl = GDB_CLASS_BP_MODIFIED;
+        str.erase(0, 19);
+        this->parseResults(o, str);
+    }
+    else if(!str.compare(0, 18, "breakpoint-deleted"))
+    {
+        o->cl = GDB_CLASS_BP_DELETED;
+        str.erase(0, 18);
         this->parseResults(o, str);
     }
     else
@@ -336,17 +389,6 @@ static GDB_STOP_REASON getStopReasonFromString(const std::string &reason)
     }
 
     return GDB_STOP_REASON_UNKNOWN;
-}
-
-static GDBResult *findResult(GDBOutput *o, const std::string &name)
-{
-    for(std::vector<GDBResult *>::iterator it = o->rs.begin(); it != o->rs.end(); it++)
-    {
-        if((*it)->var == name)
-            return *it;
-    }
-
-    return NULL;
 }
 
 GDBStopResult *GDB::getStopResult(GDBOutput *o)
@@ -663,3 +705,66 @@ GDBResult *GDB::parseResult(std::string &str, GDBResult *pres)
     return res;
 }
 
+void GDB::addOrUpdateBreakpoint(GDBOutput *o)
+{
+    GDBBreakpoint *bp;
+    GDBResult *res = o->rs[0];
+    bool add = true;
+    std::vector<GDBBreakpoint *>::iterator it = std::find_if(this->m_breakpoints.begin(), this->m_breakpoints.end(), [res](const auto &v){ return v->number == res->mp["number"]->cstr;});
+
+
+
+    if(it == this->m_breakpoints.end())
+    {
+        bp = new GDBBreakpoint();
+    }
+    else
+    {
+        add = false;
+        bp = *it;
+    }
+
+    if(bp)
+    {
+
+        bp->number = res->mp["number"]->cstr;
+        bp->enabled = res->mp["enabled"]->cstr == "y" ? true : false;
+
+        if(res->mp["fullname"])
+        {
+            bp->fullname = res->mp["fullname"]->cstr;
+        }
+
+        if(res->mp["filename"])
+        {
+            bp->filename = res->mp["filename"]->cstr;
+        }
+
+        if(res->mp["line"])
+        {
+            bp->line = stoi(res->mp["line"]->cstr);
+        }
+
+        bp->times = stoi(res->mp["times"]->cstr);
+        if(add)
+            this->m_breakpoints.push_back(bp);
+    }
+}
+
+void GDB::deleteBreakpoint(GDBOutput *o)
+{
+    GDBResult *res = findResult(o, "id");
+
+    std::vector<GDBBreakpoint *>::iterator it = std::find_if(this->m_breakpoints.begin(), this->m_breakpoints.end(), [res](const auto &v){ return v->number == res->cstr;});
+
+    if(it != this->m_breakpoints.end())
+    {
+        delete(*it);
+        this->m_breakpoints.erase(it);
+    }
+}
+
+const std::vector<GDBBreakpoint *> &GDB::getBreakpoints(void)
+{
+    return this->m_breakpoints;
+}

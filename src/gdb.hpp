@@ -37,7 +37,11 @@ typedef enum
     GDB_CLASS_RUNNING,
     GDB_CLASS_CONNECTED,
     GDB_CLASS_ERROR,
-    GDB_CLASS_EXIT
+    GDB_CLASS_EXIT,
+    GDB_CLASS_BP_ADDED,
+    GDB_CLASS_BP_MODIFIED,
+    GDB_CLASS_BP_DELETED
+
 } GDB_MESSAGE_CLASS;
 
 typedef enum
@@ -129,13 +133,31 @@ typedef enum
     GDB_STATE_STOPPED
 } GDBState;
 
+
+typedef struct
+{
+    std::string number;
+    bool enabled;
+    bool pending;
+    std::string filename;
+    std::string fullname;
+    std::string cond;
+    int times;
+    int line;
+} GDBBreakpoint;
+
 class GDB
 {
     private:
         std::ostream &m_consoleStream;
+
         GDBState m_state;
+
         std::string m_currentFile;
         int m_currentSourceLine;
+
+        std::vector<GDBBreakpoint *> m_breakpoints;
+
     public:
         GDB(std::ostream &consoleStream);
 
@@ -146,6 +168,7 @@ class GDB
         void poll(void);
         std::string getCurrentFilePath();
         int getCurrentSourceLine();
+        const std::vector<GDBBreakpoint *> &getBreakpoints(void);
 
     protected:
         virtual bool send(const std::string &message) = 0;
@@ -154,20 +177,26 @@ class GDB
         GDBOutput *parseOutput(std::string &str);
         void parseResultRecord(GDBOutput *o, std::string &str);
         void parseExecAsyncRecord(GDBOutput *o, std::string &str);
+        void parseNotifyAsyncRecord(GDBOutput *o, std::string &str);
         void parseAsyncRecord(GDBOutput *o, std::string &str);
         void parseConsoleStreamOutput(GDBOutput *o, std::string &str);
         void parseConsoleOutput(GDBOutput *o, std::string &str);
+        void parseResults(GDBOutput *o, std::string &str);
+        GDBResult *parseResult(std::string &str, GDBResult *pres = NULL);
         void parseString(GDBResult *o, std::string &str);
         void parseTuple(GDBResult *o, std::string &str);
         void parseList(GDBResult *o, std::string &str);
+
+        void addOrUpdateBreakpoint(GDBOutput *o);
+        void deleteBreakpoint(GDBOutput *o);
+
         GDBOutput *getResultRecord(GDBOutput *o);
         GDBStopResult *getStopResult(GDBOutput *o);
+        bool checkResultDone();
         bool checkResult(GDB_MESSAGE_CLASS c);
+
         void freeOutput(GDBOutput *o);
         void freeResult(GDBResult *res);
-        bool checkResultDone();
-        void parseResults(GDBOutput *o, std::string &str);
-        GDBResult *parseResult(std::string &str, GDBResult *pres = NULL);
 };
 
 #endif
