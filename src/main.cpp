@@ -10,6 +10,7 @@
 #include "gdbwindows.hpp"
 #include "gdbconsole.hpp"
 #include "sourcewindow.hpp"
+#include "breakpointwindow.hpp"
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -115,6 +116,7 @@ int main(int argc, char **argv)
     {
         GDBConsole console(&gdb, consoleStream);
         SourceWindow srcWindow(&gdb);
+        BreakpointWindow bpWindow(&gdb);
         while (!glfwWindowShouldClose(window))
         {
             gdb.poll();
@@ -128,36 +130,7 @@ int main(int argc, char **argv)
 
 
                 /* Breakpoints */
-                ImGui::Begin("Breakpoints");
-                {
-                    const std::vector<GDBBreakpoint *> &bps = gdb.getBreakpoints();
-                    ImGui::Columns(4, "#breapointlist", true);
-                    ImGui::Separator();
-                    ImGui::Text("Enabled"); ImGui::NextColumn();
-                    ImGui::Text("Number"); ImGui::NextColumn();
-                    ImGui::Text("Location"); ImGui::NextColumn();
-                    ImGui::Text("Count"); ImGui::NextColumn();
-                    ImGui::Separator();
-                    for(std::vector<GDBBreakpoint *>::const_iterator it = bps.begin(); it != bps.end(); it++)
-                    {
-                        bool checked = (*it)->enabled;
-                        ImGui::PushID(*it);
-                        ImGui::Checkbox("##enabled", &checked);
-                        ImGui::NextColumn();
-                        ImGui::Text((char *)(*it)->number.c_str());
-                        ImGui::NextColumn();
-                        ImGui::Text("%s : %d", (char *)(*it)->fullname.c_str(), (*it)->line);
-                        ImGui::NextColumn();
-                        ImGui::Text((char *)(std::to_string((*it)->times).c_str()));
-                        ImGui::PopID();
-                        ImGui::NextColumn();
-                    }
-                    ImGui::Columns(1);
-                    ImGui::Separator();
-
-                }
-                ImGui::End();
-
+                bpWindow.draw();
                 /* Console */
                 console.draw();
                 /* Source File */

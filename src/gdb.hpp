@@ -168,7 +168,9 @@ class GDB
         void poll(void);
         std::string getCurrentFilePath();
         int getCurrentSourceLine();
+
         const std::vector<GDBBreakpoint *> &getBreakpoints(void);
+        void setBreakpointState(std::string bp, bool state);
 
     protected:
         virtual bool send(const std::string &message) = 0;
@@ -187,6 +189,7 @@ class GDB
         void parseTuple(GDBResult *o, std::string &str);
         void parseList(GDBResult *o, std::string &str);
 
+        GDBBreakpoint *findBreakpoint(std::string bp);
         void addOrUpdateBreakpoint(GDBOutput *o);
         void deleteBreakpoint(GDBOutput *o);
 

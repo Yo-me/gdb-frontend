@@ -710,18 +710,17 @@ void GDB::addOrUpdateBreakpoint(GDBOutput *o)
     GDBBreakpoint *bp;
     GDBResult *res = o->rs[0];
     bool add = true;
-    std::vector<GDBBreakpoint *>::iterator it = std::find_if(this->m_breakpoints.begin(), this->m_breakpoints.end(), [res](const auto &v){ return v->number == res->mp["number"]->cstr;});
+    bp = this->findBreakpoint(res->mp["number"]->cstr);
 
 
 
-    if(it == this->m_breakpoints.end())
+    if(!bp)
     {
         bp = new GDBBreakpoint();
     }
     else
     {
         add = false;
-        bp = *it;
     }
 
     if(bp)
@@ -768,3 +767,45 @@ const std::vector<GDBBreakpoint *> &GDB::getBreakpoints(void)
 {
     return this->m_breakpoints;
 }
+
+GDBBreakpoint *GDB::findBreakpoint(std::string bp)
+{
+    std::vector<GDBBreakpoint *>::iterator it = std::find_if(this->m_breakpoints.begin(), this->m_breakpoints.end(), [bp](const auto &v){ return v->number == bp;});
+
+    if(it != this->m_breakpoints.end())
+    {
+        return *it;
+    }
+    else
+    {
+        return NULL;
+    }
+
+}
+
+void GDB::setBreakpointState(std::string bp, bool state)
+{
+    std::ostringstream cmd;
+    if(state)
+    {
+        cmd << "-break-enable " << bp;
+    }
+    else
+    {
+        cmd << "-break-disable " << bp;
+    }
+
+    cmd << "\n";
+
+    this->send(cmd.str());
+
+    if(this->checkResultDone())
+    {
+        GDBBreakpoint * b = this->findBreakpoint(bp);
+        if(b)
+        {
+            b->enabled = state;
+        }
+    }
+}
+
