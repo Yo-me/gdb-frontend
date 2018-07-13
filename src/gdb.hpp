@@ -172,7 +172,12 @@ class GDB
         GDBState getState();
 
         const std::vector<GDBBreakpoint *> &getBreakpoints(void);
+        std::map<int, GDBBreakpoint *> *getBreakpoints(std::string filename);
         void setBreakpointState(std::string bp, bool state);
+        void breakFileLine(const std::string &filename, int line);
+        void breakDelete(const std::string &number);
+
+        std::map<int, bool> *getExecutableLines(const std::string &filename);
 
     protected:
         virtual bool send(const std::string &message) = 0;
@@ -194,7 +199,7 @@ class GDB
 
         GDBBreakpoint *findBreakpoint(std::string bp);
         void addOrUpdateBreakpoint(GDBOutput *o);
-        void deleteBreakpoint(GDBOutput *o);
+        void deleteBreakpoint(const std::string &bp);
 
         GDBOutput *getResultRecord(GDBOutput *o);
         GDBStopResult *getStopResult(GDBOutput *o);

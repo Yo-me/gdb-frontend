@@ -26,6 +26,15 @@ static GDBResult *findResult(GDBOutput *o, const std::string &name)
     return NULL;
 }
 
+static std::string basename(std::string filename)
+{
+    size_t basename_start = filename.find_last_of("/\\", std::string::npos);
+    if(basename_start != std::string::npos)
+        return filename.substr(basename_start + 1);
+    else
+        return filename;
+}
+
 GDB::GDB(std::ostream &consoleStream):
     m_consoleStream(consoleStream),
     m_state(GDB_STATE_STOPPED),
@@ -146,8 +155,9 @@ GDBOutput *GDB::getResponse()
                 }
                 else if(o->t == GDB_TYPE_OUT_OF_BAND && o->st == GDB_SUBTYPE_ASYNC && o->cl == GDB_CLASS_BP_DELETED)
                 {
+                    GDBResult *res = findResult(o, "id");
                     add = false;
-                    this->deleteBreakpoint(o);
+                    this->deleteBreakpoint(res->cstr);
                 }
                 else
                 {
@@ -316,6 +326,7 @@ void GDB::parseResultRecord(GDBOutput *o, std::string &str)
         /* TODO Handle error */
     }
     o->t = GDB_TYPE_RESULT_RECORD;
+    this->parseResults(o, str);
 }
 
 void GDB::parseConsoleStreamOutput(GDBOutput *o, std::string &str)
@@ -743,9 +754,9 @@ void GDB::addOrUpdateBreakpoint(GDBOutput *o)
             bp->fullname = res->mp["fullname"]->cstr;
         }
 
-        if(res->mp["filename"])
+        if(res->mp["file"])
         {
-            bp->filename = res->mp["filename"]->cstr;
+            bp->filename = res->mp["file"]->cstr;
         }
 
         if(res->mp["line"])
@@ -759,11 +770,10 @@ void GDB::addOrUpdateBreakpoint(GDBOutput *o)
     }
 }
 
-void GDB::deleteBreakpoint(GDBOutput *o)
+void GDB::deleteBreakpoint(const std::string &bp)
 {
-    GDBResult *res = findResult(o, "id");
 
-    std::vector<GDBBreakpoint *>::iterator it = std::find_if(this->m_breakpoints.begin(), this->m_breakpoints.end(), [res](const auto &v){ return v->number == res->cstr;});
+    std::vector<GDBBreakpoint *>::iterator it = std::find_if(this->m_breakpoints.begin(), this->m_breakpoints.end(), [bp](const auto &v){ return v->number == bp;});
 
     if(it != this->m_breakpoints.end())
     {
@@ -775,6 +785,24 @@ void GDB::deleteBreakpoint(GDBOutput *o)
 const std::vector<GDBBreakpoint *> &GDB::getBreakpoints(void)
 {
     return this->m_breakpoints;
+}
+
+std::map<int, GDBBreakpoint *> *GDB::getBreakpoints(std::string filename)
+{
+    std::map<int, GDBBreakpoint *> *mp = new std::map<int, GDBBreakpoint *>();
+    std::string bName = basename(filename);
+    if(mp)
+    {
+        for(auto it = this->m_breakpoints.begin(); it != this->m_breakpoints.end(); it++)
+        {
+            if((*it)->filename == bName)
+            {
+                (*mp)[(*it)->line] = *it;
+            }
+        }
+    }
+
+    return mp;
 }
 
 GDBBreakpoint *GDB::findBreakpoint(std::string bp)
@@ -818,3 +846,68 @@ void GDB::setBreakpointState(std::string bp, bool state)
     }
 }
 
+void GDB::breakFileLine(const std::string &filename, int line)
+{
+    GDBOutput *o;
+    std::ostringstream cmd;
+
+    cmd << "-break-insert " << basename(filename) << ":" << line << "\n";
+    this->send(cmd.str());
+
+    o = this->getResponseBlk();
+
+    if(o && o->t == GDB_TYPE_RESULT_RECORD && o->cl == GDB_CLASS_DONE)
+    {
+        this->addOrUpdateBreakpoint(o);
+        this->freeOutput(o);
+    }
+}
+
+void GDB::breakDelete(const std::string &number)
+{
+    std::ostringstream cmd;
+
+    cmd << "-break-delete " << number << "\n";
+
+    this->send(cmd.str());
+
+    if(this->checkResultDone())
+    {
+        this->deleteBreakpoint(number);
+    }
+}
+
+std::map<int, bool> *GDB::getExecutableLines(const std::string &filename)
+{
+    std::map<int, bool> *mp = NULL;
+    if(filename.length() > 0)
+    {
+        mp = new std::map<int, bool>;
+
+        if(mp)
+        {
+            std::ostringstream cmd;
+            GDBOutput *o;
+            cmd << "-symbol-list-lines ";
+            cmd << basename(filename);
+            cmd << "\n";
+            this->send(cmd.str());
+
+            o = this->getResponseBlk();
+            if(o && o->t == GDB_TYPE_RESULT_RECORD && o->cl == GDB_CLASS_DONE)
+            {
+                GDBResult *res = o->rs[0];
+                for(auto it = res->vec.begin(); it != res->vec.end(); it++)
+                {
+                    if((*it)->mp["line"])
+                    {
+                        (*mp)[stoi((*it)->mp["line"]->cstr)] = true;
+                    }
+                }
+            }
+            this->freeOutput(o);
+        }
+    }
+
+    return mp;
+}

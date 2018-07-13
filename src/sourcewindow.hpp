@@ -5,6 +5,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <map>
 
 
 class SourceWindow
@@ -14,6 +15,7 @@ class SourceWindow
         std::string m_currentFileName;
         std::stringstream m_currentFileContent;
         int m_currentSourceLine;
+        std::map<int, bool> *m_executableLines;
 
     public:
         SourceWindow(GDB *gdb);
