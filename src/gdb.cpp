@@ -790,12 +790,11 @@ const std::vector<GDBBreakpoint *> &GDB::getBreakpoints(void)
 std::map<int, GDBBreakpoint *> *GDB::getBreakpoints(std::string filename)
 {
     std::map<int, GDBBreakpoint *> *mp = new std::map<int, GDBBreakpoint *>();
-    std::string bName = basename(filename);
     if(mp)
     {
         for(auto it = this->m_breakpoints.begin(); it != this->m_breakpoints.end(); it++)
         {
-            if((*it)->filename == bName)
+            if((*it)->fullname == filename)
             {
                 (*mp)[(*it)->line] = *it;
             }
