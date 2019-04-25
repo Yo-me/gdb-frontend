@@ -5,12 +5,17 @@
 
 SourceWindow::SourceWindow(GDB *gdb)
     :m_gdb(gdb), m_currentSourceLine(-1), m_executableLines(NULL)
-{}
+{
+
+    m_sourceView.SetPalette(TextEditor::GetDarkPalette());
+    m_sourceView.SetReadOnly(true);
+}
 
 void SourceWindow::draw()
 {
     if(ImGui::Begin("Source File", NULL, ImGuiWindowFlags_NoCollapse))
     {
+        TextEditor::Breakpoints breakpoints;
         ImVec2 textSize;
         int nbLines;
         float lineNumbersColumnWidth;
@@ -33,9 +38,25 @@ void SourceWindow::draw()
             {
                 this->m_currentFileContent << "Unable to open file " << this->m_currentFileName;
             }
+            this->m_sourceView.SetText(this->m_currentFileContent.str());
         }
         bpMap = this->m_gdb->getBreakpoints(this->m_currentFileName);
-        textSize = ImGui::CalcTextSize((char *)this->m_currentFileContent.str().c_str(), NULL);
+
+        for(auto bp : *bpMap)
+        {
+            if(bp.second->enabled)
+                breakpoints.insert(bp.first);
+        }
+
+        m_sourceView.SetBreakpoints(breakpoints);
+
+        if(this->m_gdb->getCurrentSourceLine() != -1 && this->m_currentSourceLine != this->m_gdb->getCurrentSourceLine()-1)
+        {
+            this->m_currentSourceLine = this->m_gdb->getCurrentSourceLine() - 1;
+            m_sourceView.SetCursorPosition( TextEditor::Coordinates(m_currentSourceLine, 0));
+        }
+        m_sourceView.Render("SourceView");
+#if 0
         if(this->m_currentFileContent.str().length() > 0)
         {
             std::string content = this->m_currentFileContent.str();
@@ -159,6 +180,7 @@ void SourceWindow::draw()
             }
         }
         ImGui::PopStyleVar();
+#endif
     }
     ImGui::End();
 }

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include "TextEditor.h"
 
 
 class SourceWindow
@@ -16,6 +17,8 @@ class SourceWindow
         std::stringstream m_currentFileContent;
         int m_currentSourceLine;
         std::map<int, bool> *m_executableLines;
+        
+        TextEditor m_sourceView;
 
     public:
         SourceWindow(GDB *gdb);
