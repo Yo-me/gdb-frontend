@@ -3,6 +3,7 @@
 
 #include <string>
 #include <ostream>
+#include <sstream>
 #include <vector>
 #include <map>
 
@@ -150,7 +151,7 @@ typedef struct
 class GDB
 {
     private:
-        std::ostream &m_consoleStream;
+        std::ostringstream m_consoleStream;
 
         GDBState m_state;
 
@@ -160,7 +161,7 @@ class GDB
         std::vector<GDBBreakpoint *> m_breakpoints;
 
     public:
-        GDB(std::ostream &consoleStream);
+        GDB();
 
         bool setExeFile(const std::string &filename);
         GDBOutput *getResponse();
@@ -178,6 +179,7 @@ class GDB
         void breakDelete(const std::string &number);
 
         std::map<int, bool> *getExecutableLines(const std::string &filename);
+        std::ostringstream *getConsoleStream();
 
     protected:
         virtual bool send(const std::string &message) = 0;

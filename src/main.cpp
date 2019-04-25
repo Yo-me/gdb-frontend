@@ -10,9 +10,7 @@
 #include "imgui_impl_opengl3.h"
 
 #include "gdbwindows.hpp"
-#include "gdbconsole.hpp"
-#include "sourcewindow.hpp"
-#include "breakpointwindow.hpp"
+#include "mainwindow.hpp"
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -107,6 +105,11 @@ int main(int argc, char **argv)
 
     /* Setup imgui */
     ImGui::CreateContext();
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable | ImGuiConfigFlags_DockingEnable;
+        //io.ConfigViewportsNoAutoMerge = true;
+    }
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
     // Setup style
@@ -114,8 +117,8 @@ int main(int argc, char **argv)
         ImGuiStyle &style = ImGui::GetStyle();
         ImGui::StyleColorsDark();
 
-        style.WindowRounding = 6.0f;
-        style.FrameRounding = 6.0f;
+        style.WindowRounding = 0.0f;
+        style.FrameRounding = 0.0f;
     }
 
     glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -124,7 +127,7 @@ int main(int argc, char **argv)
     glfwSetCharCallback(window, character_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
 
-    GDBWindows gdb(dynamic_cast<std::ostream&>(consoleStream), gdbPath);
+    GDBWindows gdb(gdbPath);
 
     if(!gdb.connect())
     {
@@ -132,11 +135,13 @@ int main(int argc, char **argv)
         std::cout << "Error connecting to gdb" << std::endl;
     }
     {
-        GDBConsole console(&gdb, consoleStream);
-        SourceWindow srcWindow(&gdb);
-        BreakpointWindow bpWindow(&gdb);
+        ImGuiIO& io = ImGui::GetIO();
+        MainWindow mainWindow(&gdb);
         while (!glfwWindowShouldClose(window) && gdb.getState() != GDB_STATE_EXITED)
         {
+            /* Poll for and process events */
+            glfwPollEvents();
+
             gdb.poll();
             /* Render ImgUI windows */
             {
@@ -147,33 +152,36 @@ int main(int argc, char **argv)
                 ImGui_ImplGlfw_NewFrame();
                 ImGui::NewFrame();
 
-
-
-                /* Breakpoints */
-                bpWindow.draw();
-                /* Console */
-                console.draw();
-                /* Source File */
-                srcWindow.draw();
-
-
-#if 1
+#if 0
                 ImGui::ShowMetricsWindow();
                 ImGui::ShowDemoWindow(&displayWindow);
 #endif
+
+                mainWindow.draw();
+
+
                 ImGui::Render();
                 glfwGetFramebufferSize(window, &display_w, &display_h);
                 glViewport(0, 0, display_w, display_h);
                 glClearColor(0.0, 0.0, 0.0, 1.0);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
                 ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+                // Update and Render additional Platform Windows
+                // (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
+                //  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
+                if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+                {
+                    GLFWwindow* backup_current_context = glfwGetCurrentContext();
+                    ImGui::UpdatePlatformWindows();
+                    ImGui::RenderPlatformWindowsDefault();
+                    glfwMakeContextCurrent(backup_current_context);
+                }
             }
 
             /* Swap front and back buffers */
             glfwSwapBuffers(window);
 
-            /* Poll for and process events */
-            glfwPollEvents();
         }
     }
 

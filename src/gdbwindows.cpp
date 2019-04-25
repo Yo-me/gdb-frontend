@@ -3,8 +3,8 @@
 
 #include "gdbwindows.hpp"
 
-GDBWindows::GDBWindows(std::ostream &consoleStream, std::string path)
-: GDB(consoleStream), m_path(path)
+GDBWindows::GDBWindows(std::string path)
+: GDB(), m_path(path)
 {
 }
 

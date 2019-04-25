@@ -35,12 +35,16 @@ static std::string basename(std::string filename)
         return filename;
 }
 
-GDB::GDB(std::ostream &consoleStream):
-    m_consoleStream(consoleStream),
+GDB::GDB():
     m_state(GDB_STATE_STOPPED),
     m_currentFile(""),
     m_currentSourceLine(-1)
 {
+}
+
+std::ostringstream *GDB::getConsoleStream()
+{
+    return &m_consoleStream;
 }
 
 GDBState GDB::getState()

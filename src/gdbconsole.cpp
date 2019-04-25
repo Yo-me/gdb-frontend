@@ -5,9 +5,9 @@
 #include <iostream>
 
 
-GDBConsole::GDBConsole(GDB *gdb, std::ostringstream &stream)
+GDBConsole::GDBConsole(GDB *gdb)
     :m_gdb(gdb),
-    m_stream(stream),
+    m_stream(*gdb->getConsoleStream()),
     m_scrollToBottom(0)
 {
 
@@ -15,7 +15,7 @@ GDBConsole::GDBConsole(GDB *gdb, std::ostringstream &stream)
 
 void GDBConsole::draw()
 {
-    if(ImGui::Begin("Console"))
+    if(ImGui::Begin("Console", NULL, ImGuiWindowFlags_NoCollapse))
     {
         const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing(); // 1 separator, 1 input text
         char command[1024] = "\0";

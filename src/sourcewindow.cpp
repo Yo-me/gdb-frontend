@@ -9,7 +9,7 @@ SourceWindow::SourceWindow(GDB *gdb)
 
 void SourceWindow::draw()
 {
-    if(ImGui::Begin("Source File"))
+    if(ImGui::Begin("Source File", NULL, ImGuiWindowFlags_NoCollapse))
     {
         ImVec2 textSize;
         int nbLines;
