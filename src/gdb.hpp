@@ -180,6 +180,11 @@ class GDB
 
         std::map<int, bool> *getExecutableLines(const std::string &filename);
         std::ostringstream *getConsoleStream();
+        void resume();
+        void next();
+        void step();
+        void finish();
+        void run();
 
     protected:
         virtual bool send(const std::string &message) = 0;

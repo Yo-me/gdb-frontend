@@ -914,3 +914,74 @@ std::map<int, bool> *GDB::getExecutableLines(const std::string &filename)
 
     return mp;
 }
+
+void GDB::resume()
+{
+    if(m_state == GDB_STATE_STOPPED)
+    {
+        GDBOutput *rsp;
+
+        this->send("-exec-continue\n");
+
+        rsp = this->getResponse();
+
+        delete rsp;
+    }
+}
+
+void GDB::next()
+{
+    if(m_state == GDB_STATE_STOPPED)
+    {
+        GDBOutput *rsp;
+
+        this->send("-exec-next\n");
+
+        rsp = this->getResponse();
+
+        delete rsp;
+    }
+
+}
+
+void GDB::step()
+{
+    if(m_state == GDB_STATE_STOPPED)
+    {
+        GDBOutput *rsp;
+
+        this->send("-exec-step\n");
+
+        rsp = this->getResponse();
+
+        delete rsp;
+    }
+}
+
+void GDB::finish()
+{
+    if(m_state == GDB_STATE_STOPPED)
+    {
+        GDBOutput *rsp;
+
+        this->send("-exec-finish\n");
+
+        rsp = this->getResponse();
+
+        delete rsp;
+    }
+}
+
+void GDB::run()
+{
+    if(m_state == GDB_STATE_STOPPED)
+    {
+        GDBOutput *rsp;
+
+        this->send("-exec-run\n");
+
+        rsp = this->getResponse();
+
+        delete rsp;
+    }
+}

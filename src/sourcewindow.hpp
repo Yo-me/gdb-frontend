@@ -19,10 +19,12 @@ class SourceWindow
         std::map<int, bool> *m_executableLines;
         
         TextEditor m_sourceView;
+        bool m_isFocused;
 
     public:
         SourceWindow(GDB *gdb);
         void draw();
+        bool isFocused();
 };
 
 #endif

@@ -4,7 +4,7 @@
 #include <algorithm>
 
 SourceWindow::SourceWindow(GDB *gdb)
-    :m_gdb(gdb), m_currentSourceLine(-1), m_executableLines(NULL)
+    :m_gdb(gdb), m_currentSourceLine(-1), m_executableLines(NULL), m_isFocused(false)
 {
 
     m_sourceView.SetPalette(TextEditor::GetDarkPalette());
@@ -22,6 +22,7 @@ void SourceWindow::draw()
         float numbersScrollMax;
         float bpWidth = ImGui::CalcTextSize("-").x + ImGui::GetStyle().WindowPadding.x;
         std::map<int, GDBBreakpoint *> *bpMap;
+        m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
         if(this->m_currentFileName != this->m_gdb->getCurrentFilePath())
         {
             this->m_currentFileContent.str("");
@@ -183,4 +184,9 @@ void SourceWindow::draw()
 #endif
     }
     ImGui::End();
+}
+
+bool SourceWindow::isFocused()
+{
+    return m_isFocused;
 }
