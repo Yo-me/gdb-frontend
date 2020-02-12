@@ -21,6 +21,7 @@ bool GDBWindows::connect()
     DWORD pipeMode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
     std::ostringstream commandLine;
     std::string consolePipeName = "\\\\.\\pipe\\gdbfrontend";
+    //std::string miPipeNameGdb = "\\\\\\\\.\\\\pipe\\\\gdbfrontend";
     InitializeSecurityDescriptor(&saDesc, SECURITY_DESCRIPTOR_REVISION);
     SetSecurityDescriptorDacl(&saDesc, FALSE, NULL, FALSE);
 
@@ -102,6 +103,7 @@ bool GDBWindows::connect()
         Sleep(1000);
     }
     this->sendCLI("set new-console on");
+    //this->sendCLI("new-ui mi " + miPipeNameGdb);
 
     return true;
 }
@@ -113,13 +115,6 @@ bool GDBWindows::readline(std::string &message)
     DWORD length = 0;
     BOOL success;
 
-    success = ReadFile(this->m_appPipe, buffer, 1024, &length, NULL);
-    if(success)
-    {
-        buffer[length] = 0;
-        std::cout << "APPCONSOLE : " << buffer << std::endl;
-    }
-
     do
     {
         success = ReadFile(this->m_fromGDB, &c, 1, &length, NULL);
@@ -127,6 +122,7 @@ bool GDBWindows::readline(std::string &message)
         {
             if(c == '\n')
             {
+                std::cout << "Received from gdb : " << message << std::endl;
                 return true;
             }
             else if(c != '\r')
@@ -154,6 +150,21 @@ bool GDBWindows::send(const std::string &message)
     std::cout << ((success && length > 0) ? "Success " : "Failed ") << GetLastError() << std::endl;
     return (success && length > 0);
 }
+
+#if 0
+bool GDBWindows::send(const std::string &message)
+{
+    char *buffer[8*1024];
+    DWORD length;
+    BOOL success;
+    std::cout << "Sending data to gdb : " << message;
+
+    success = WriteFile(this->m_miPipe, message.c_str(), message.length(), &length, NULL);
+
+    std::cout << ((success && length > 0) ? "Success " : "Failed ") << GetLastError() << std::endl;
+    return (success && length > 0);
+}
+#endif
 
 bool GDBWindows::gdbProcessRunning()
 {

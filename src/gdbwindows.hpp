@@ -12,7 +12,6 @@ class GDBWindows : public GDB
         std::string m_path;
         HANDLE m_toGDB;
         HANDLE m_fromGDB;
-        HANDLE m_consolePipe;
         HANDLE m_appPipe;
         HANDLE m_processHandle;
 

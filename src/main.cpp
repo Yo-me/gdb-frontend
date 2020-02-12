@@ -43,13 +43,13 @@ int main(int argc, char **argv)
     }
     {
         MainWindow mainWindow(&gdb);
+
         while (!mainWindow.shouldClose() && gdb.getState() != GDB_STATE_EXITED)
         {
 
             gdb.poll();
             /* Render ImgUI windows */
             {
-
                 mainWindow.draw();
             }
 

@@ -83,12 +83,42 @@ bool GDB::sendCLI(const std::string &command)
     std::ostringstream cmd;
     GDBOutput *rsp;
     cmd << "-interpreter-exec console \"" << command << "\"\n";
+
     this->send(cmd.str());
 
     return this->checkResultDone();
 }
 
+void GDB::computeFrameStack()
+{
+    if(this->m_state == GDB_STATE_STOPPED)
+    {
+        GDBOutput *rsp;
 
+        this->send("-stack-list-frames\n");
+
+        rsp = this->getResponseBlk();
+        
+        if(rsp)
+        { 
+            GDBResult *frames = rsp->rs[0];
+            std::cout << "==== Stack Frame ====" << std::endl;
+            this->m_stackFrame.clear();
+            for(GDBResult *frame : frames->vec)
+            {
+                GDBFrame frameStruct;
+
+                frameStruct.func = frame->mp["func"]->cstr;
+                frameStruct.fullname = frame->mp["fullname"]->cstr;
+                frameStruct.line = stoi(frame->mp["line"]->cstr);
+                std::cout << frame->mp["level"]->cstr << " : " << frame->mp["func"]->cstr << std::endl;
+                this->m_stackFrame.push_back(frameStruct);
+            }
+
+            delete rsp;
+        }
+    }
+}
 
 void GDB::poll(void)
 {
@@ -111,6 +141,7 @@ void GDB::poll(void)
                     this->m_currentFile = "";
                     this->m_currentSourceLine = -1;
                 }
+                this->computeFrameStack();
             }
             delete(s->frame);
             delete(s);
@@ -536,7 +567,7 @@ void GDB::freeResult(GDBResult *res)
         case GDB_VALUE_TYPE_TUPLE:
             for(std::map<std::string, GDBResult*>::iterator it = res->mp.begin(); it != res->mp.end(); it++)
             {
-                std::cout << "Freeing " << it->first << std::endl;
+                //std::cout << "Freeing " << it->first << std::endl;
                 if(it->second)
                     this->freeResult(it->second);
             }
@@ -668,8 +699,8 @@ void GDB::parseResults(GDBOutput *o, std::string &str)
             o->rs.push_back(res);
     } while(res);
 
-    for(std::vector<GDBResult*>::iterator it = o->rs.begin(); it != o->rs.end(); it++)
-        dumpRes(*it);
+    //for(std::vector<GDBResult*>::iterator it = o->rs.begin(); it != o->rs.end(); it++)
+    //    dumpRes(*it);
 
 }
 
@@ -984,4 +1015,9 @@ void GDB::run()
 
         delete rsp;
     }
+}
+
+const std::vector<GDBFrame> &GDB::getFrameStack()
+{
+    return this->m_stackFrame;
 }

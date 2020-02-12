@@ -159,6 +159,7 @@ class GDB
         int m_currentSourceLine;
 
         std::vector<GDBBreakpoint *> m_breakpoints;
+        std::vector<GDBFrame> m_stackFrame;
 
     public:
         GDB();
@@ -185,7 +186,8 @@ class GDB
         void step();
         void finish();
         void run();
-
+        void computeFrameStack();
+        const std::vector<GDBFrame> &getFrameStack();
     protected:
         virtual bool send(const std::string &message) = 0;
         virtual bool readline(std::string &message) = 0;
