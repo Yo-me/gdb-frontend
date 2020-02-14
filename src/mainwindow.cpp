@@ -22,7 +22,7 @@ void MainWindow::characterCallback(GLFWwindow* window, unsigned int codepoint)
 {
     MainWindow *mainWindow = static_cast<MainWindow *>(glfwGetWindowUserPointer(window));
     ImGuiIO &io = ImGui::GetIO();
-    if(!io.WantCaptureKeyboard || mainWindow->m_sourceWindow.isFocused())
+    if(!io.WantCaptureKeyboard || mainWindow->m_sourceWindow.isFocused() && mainWindow->m_gdb->getState() == GDB_STATE_STOPPED)
     {
         switch(codepoint)
         {
@@ -162,7 +162,7 @@ void MainWindow::draw(void)
     ImGui::SetNextWindowViewport(viewport->ID);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(2.0f, 2.0f));
 
     ImGui::Begin("MainWindow", NULL, window_flags);
     ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);

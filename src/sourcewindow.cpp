@@ -27,9 +27,9 @@ void SourceWindow::draw()
         {
             this->m_currentFileContent.str("");
             this->m_currentFileName = this->m_gdb->getCurrentFilePath();
-            if(this->m_executableLines)
-                delete(this->m_executableLines);
-            this->m_executableLines = this->m_gdb->getExecutableLines(this->m_currentFileName);
+            //if(this->m_executableLines)
+            //    delete(this->m_executableLines);
+            //this->m_executableLines = this->m_gdb->getExecutableLines(this->m_currentFileName);
             std::ifstream f(this->m_currentFileName);
             if(!f.fail())
             {

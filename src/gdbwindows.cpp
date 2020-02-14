@@ -143,6 +143,7 @@ bool GDBWindows::send(const std::string &message)
     char *buffer[8*1024];
     DWORD length;
     BOOL success;
+
     std::cout << "Sending data to gdb : " << message;
 
     success = WriteFile(this->m_toGDB, message.c_str(), message.length(), &length, NULL);

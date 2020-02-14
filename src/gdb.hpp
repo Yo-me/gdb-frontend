@@ -79,6 +79,11 @@ typedef struct GDBOutput
     std::vector<GDBResult *> rs;
 
     struct GDBOutput *next;
+
+    GDBOutput()
+    {
+        next = NULL;
+    }
 } GDBOutput;
 
 typedef enum
@@ -106,7 +111,7 @@ typedef struct
     std::string file;
     std::string fullname;
     int line;
-    GDBResult *args;
+    std::vector<std::string> args;
 
 } GDBFrame;
 
@@ -157,6 +162,7 @@ class GDB
 
         std::string m_currentFile;
         int m_currentSourceLine;
+        int m_currentFrameLevel;
 
         std::vector<GDBBreakpoint *> m_breakpoints;
         std::vector<GDBFrame> m_stackFrame;
@@ -171,6 +177,8 @@ class GDB
         void poll(void);
         std::string getCurrentFilePath();
         int getCurrentSourceLine();
+        int getCurrentFrameLevel();
+        void setCurrentFrameLevel(int frameLevel);
         GDBState getState();
 
         const std::vector<GDBBreakpoint *> &getBreakpoints(void);
@@ -211,6 +219,7 @@ class GDB
         void deleteBreakpoint(const std::string &bp);
 
         GDBOutput *getResultRecord(GDBOutput *o);
+        GDBOutput *getNextResultRecordWithData(GDBOutput *o);
         GDBStopResult *getStopResult(GDBOutput *o);
         bool checkResultDone();
         bool checkResult(GDB_MESSAGE_CLASS c);

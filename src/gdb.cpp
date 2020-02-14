@@ -62,6 +62,21 @@ int GDB::getCurrentSourceLine()
     return this->m_currentSourceLine;
 }
 
+int GDB::getCurrentFrameLevel()
+{
+    return this->m_currentFrameLevel;   
+}
+
+void GDB::setCurrentFrameLevel(int frameLevel)
+{
+    if(frameLevel < this->m_stackFrame.size())
+    {
+        this->m_currentFrameLevel = frameLevel;
+        this->m_currentSourceLine = this->m_stackFrame[frameLevel].line;
+        this->m_currentFile = this->m_stackFrame[frameLevel].fullname;
+    }
+}
+
 bool GDB::setExeFile(const std::string &filename)
 {
     std::ostringstream cmd;
@@ -94,29 +109,55 @@ void GDB::computeFrameStack()
     if(this->m_state == GDB_STATE_STOPPED)
     {
         GDBOutput *rsp;
-
+        GDBOutput *stackResult;
+        GDBOutput *rspArgs;
+        GDBOutput *args;
+        bool found = false;
         this->send("-stack-list-frames\n");
 
         rsp = this->getResponseBlk();
-        
-        if(rsp)
+        stackResult = this->getNextResultRecordWithData(rsp);
+
+        this->send("-stack-list-arguments 2\n");
+        rspArgs = this->getResponseBlk();
+
+        args = this->getNextResultRecordWithData(rspArgs);
+
+        if(stackResult && args)
         { 
-            GDBResult *frames = rsp->rs[0];
+            int index = 0;
+            GDBResult *frames = stackResult->rs[0];
             std::cout << "==== Stack Frame ====" << std::endl;
             this->m_stackFrame.clear();
             for(GDBResult *frame : frames->vec)
             {
                 GDBFrame frameStruct;
-
+                GDBResult *argResult = args->rs[0];
+                std::string argsString = "";
                 frameStruct.func = frame->mp["func"]->cstr;
                 frameStruct.fullname = frame->mp["fullname"]->cstr;
                 frameStruct.line = stoi(frame->mp["line"]->cstr);
+                frameStruct.level = stoi(frame->mp["level"]->cstr);
+                for(GDBResult *arg : argResult->vec[index]->mp["args"]->vec)
+                {
+                    argsString = arg->mp["type"]->cstr;
+                    
+                    if(argsString[argsString.size()-1] != '*')
+                        argsString += " ";
+                        
+                    argsString += arg->mp["name"]->cstr;
+                    frameStruct.args.push_back(argsString);
+                }
                 std::cout << frame->mp["level"]->cstr << " : " << frame->mp["func"]->cstr << std::endl;
                 this->m_stackFrame.push_back(frameStruct);
+                index++;
             }
 
-            delete rsp;
+            
         }
+
+        freeOutput(rsp);
+        freeOutput(rspArgs);
     }
 }
 
@@ -141,6 +182,7 @@ void GDB::poll(void)
                     this->m_currentFile = "";
                     this->m_currentSourceLine = -1;
                 }
+                this->m_currentFrameLevel = 0;
                 this->computeFrameStack();
             }
             delete(s->frame);
@@ -531,6 +573,20 @@ GDBOutput *GDB::getResultRecord(GDBOutput *o)
         }
     } while(o);
 
+    return o;
+}
+
+GDBOutput *GDB::getNextResultRecordWithData(GDBOutput *o)
+{
+    bool found = false;
+    while(o && found)
+    {
+        if(o->rs.size() > 0)
+        {
+            found = true;
+        }
+        o = o->next;
+    }
     return o;
 }
 
