@@ -17,6 +17,7 @@ int main(int argc, char **argv)
     std::string command;
     std::ostringstream consoleStream;
     std::string gdbPath = "gdb.exe";
+    std::string gdbArgs = "";
     int opt;
 
     while((opt = getopt(argc, argv, "g:")) != -1)
@@ -33,8 +34,12 @@ int main(int argc, char **argv)
         }
     }
 
+    for(int i = optind; i < argc; i++)
+    {
+        gdbArgs += argv[i] + std::string(" ");
+    }
 
-    GDBWindows gdb(gdbPath);
+    GDBWindows gdb(gdbPath, gdbArgs);
 
     if(!gdb.connect())
     {

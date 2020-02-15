@@ -67,6 +67,36 @@ typedef struct GDBResult
         return str == (this->var);
     }
 
+    GDBResult()
+        :next(NULL)
+    {
+    }
+
+    GDBResult(const GDBResult &result)
+    {
+        GDBResult *first;
+        this->var = result.var;
+        this->vt = result.vt;
+        this->cstr = result.cstr;
+
+        for(GDBResult *res : result.vec)
+        {
+            GDBResult *newRes = new GDBResult(*res);
+            this->vec.push_back(newRes);
+        }
+
+        for(auto it = result.mp.begin(); it != result.mp.end(); ++it)
+        {
+            GDBResult *newRes = new GDBResult(*(it->second));
+            this->mp[it->first] = newRes;
+        }
+
+        if(result.next) 
+            this->next = new GDBResult(*(result.next));
+        else
+            this->next = NULL;
+    }
+
 } GDBResult;
 
 typedef struct GDBOutput
@@ -213,6 +243,7 @@ class GDB
         void parseString(GDBResult *o, std::string &str);
         void parseTuple(GDBResult *o, std::string &str);
         void parseList(GDBResult *o, std::string &str);
+        GDBResult *sendCommandAndWaitForResult(std::string command, std::string resultName);
 
         GDBBreakpoint *findBreakpoint(std::string bp);
         void addOrUpdateBreakpoint(GDBOutput *o);

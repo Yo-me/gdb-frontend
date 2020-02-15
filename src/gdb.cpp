@@ -104,41 +104,55 @@ bool GDB::sendCLI(const std::string &command)
     return this->checkResultDone();
 }
 
+GDBResult *GDB::sendCommandAndWaitForResult(std::string command, std::string resultName)
+{
+    bool found = false;
+    GDBResult *result;
+    this->send(command);
+    do
+    {
+        GDBOutput * output = this->getResponseBlk();
+        GDBOutput * foundResponse = this->getNextResultRecordWithData(output);
+
+        while(foundResponse && !found)
+        {
+            if(foundResponse->rs[0]->var == resultName)
+            {
+                found = true;
+                result = new GDBResult(*(foundResponse->rs[0]));
+            }
+            else
+            {
+                foundResponse = this->getNextResultRecordWithData(foundResponse);
+            }
+            
+        }
+        freeOutput(output);
+    } while (!found);
+
+    return result;
+}
+
 void GDB::computeFrameStack()
 {
     if(this->m_state == GDB_STATE_STOPPED)
     {
-        GDBOutput *rsp;
-        GDBOutput *stackResult;
-        GDBOutput *rspArgs;
-        GDBOutput *args;
-        bool found = false;
-        this->send("-stack-list-frames\n");
-
-        rsp = this->getResponseBlk();
-        stackResult = this->getNextResultRecordWithData(rsp);
-
-        this->send("-stack-list-arguments 2\n");
-        rspArgs = this->getResponseBlk();
-
-        args = this->getNextResultRecordWithData(rspArgs);
-
-        if(stackResult && args)
+        GDBResult *stackResult = this->sendCommandAndWaitForResult("-stack-list-frames\n", "stack");
+        GDBResult *argsResult = this->sendCommandAndWaitForResult("-stack-list-arguments 2\n", "stack-args");;
+       
         { 
             int index = 0;
-            GDBResult *frames = stackResult->rs[0];
             std::cout << "==== Stack Frame ====" << std::endl;
             this->m_stackFrame.clear();
-            for(GDBResult *frame : frames->vec)
+            for(GDBResult *frame : stackResult->vec)
             {
                 GDBFrame frameStruct;
-                GDBResult *argResult = args->rs[0];
                 std::string argsString = "";
                 frameStruct.func = frame->mp["func"]->cstr;
                 frameStruct.fullname = frame->mp["fullname"]->cstr;
                 frameStruct.line = stoi(frame->mp["line"]->cstr);
                 frameStruct.level = stoi(frame->mp["level"]->cstr);
-                for(GDBResult *arg : argResult->vec[index]->mp["args"]->vec)
+                for(GDBResult *arg : argsResult->vec[index]->mp["args"]->vec)
                 {
                     argsString = arg->mp["type"]->cstr;
                     
@@ -152,12 +166,9 @@ void GDB::computeFrameStack()
                 this->m_stackFrame.push_back(frameStruct);
                 index++;
             }
-
-            
+            this->freeResult(stackResult);
+            this->freeResult(argsResult);  
         }
-
-        freeOutput(rsp);
-        freeOutput(rspArgs);
     }
 }
 
@@ -579,13 +590,17 @@ GDBOutput *GDB::getResultRecord(GDBOutput *o)
 GDBOutput *GDB::getNextResultRecordWithData(GDBOutput *o)
 {
     bool found = false;
-    while(o && found)
+    while(o && !found)
     {
         if(o->rs.size() > 0)
         {
             found = true;
         }
-        o = o->next;
+        else
+        {
+            o = o->next;
+        }
+        
     }
     return o;
 }

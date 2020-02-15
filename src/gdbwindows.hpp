@@ -10,13 +10,14 @@ class GDBWindows : public GDB
 {
     private:
         std::string m_path;
+        std::string m_args;
         HANDLE m_toGDB;
         HANDLE m_fromGDB;
         HANDLE m_appPipe;
         HANDLE m_processHandle;
 
     public:
-        GDBWindows(std::string path = "gdb.exe");
+        GDBWindows(std::string path = "gdb.exe", std::string gdbArgs = "");
         bool connect();
         bool readline(std::string &message);
         bool send(const std::string &message);

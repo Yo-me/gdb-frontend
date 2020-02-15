@@ -3,8 +3,8 @@
 
 #include "gdbwindows.hpp"
 
-GDBWindows::GDBWindows(std::string path)
-: GDB(), m_path(path)
+GDBWindows::GDBWindows(std::string path, std::string gdbArgs)
+: GDB(), m_path(path), m_args(gdbArgs)
 {
 }
 
@@ -75,7 +75,7 @@ bool GDBWindows::connect()
     siStartInfo.hStdInput = tmpGDBRead;
     siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
-    commandLine << this->m_path << " --interpreter=mi --quiet";
+    commandLine << this->m_path << " " << this->m_args << "--interpreter=mi --quiet";
 
     // Create the child process.
 
