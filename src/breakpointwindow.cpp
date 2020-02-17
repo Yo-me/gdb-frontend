@@ -1,4 +1,5 @@
 #include "imgui.h"
+#include "utils.hpp"
 #include "breakpointwindow.hpp"
 
 
@@ -30,7 +31,7 @@ void BreakpointWindow::draw(void)
             ImGui::NextColumn();
             ImGui::Text((char *)(*it)->number.c_str());
             ImGui::NextColumn();
-            ImGui::Text("%s : %d", (char *)(*it)->fullname.c_str(), (*it)->line);
+            ImGui::Text("%s : %d", (char *)basename((*it)->fullname).c_str(), (*it)->line);
             ImGui::NextColumn();
             ImGui::Text((char *)(std::to_string((*it)->times).c_str()));
             ImGui::PopID();

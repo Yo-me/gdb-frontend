@@ -165,7 +165,8 @@ typedef struct GDBStopResult
 
 typedef enum
 {
-    GDB_STATE_RUNNING = 0,
+    GDB_STATE_INIT = 0,
+    GDB_STATE_RUNNING,
     GDB_STATE_STOPPED,
     GDB_STATE_EXITED
 } GDBState;
@@ -212,7 +213,7 @@ class GDB
         GDBState getState();
 
         const std::vector<GDBBreakpoint *> &getBreakpoints(void);
-        std::map<int, GDBBreakpoint *> *getBreakpoints(std::string filename);
+        std::vector<GDBBreakpoint *>getBreakpoints(std::string filename);
         void setBreakpointState(std::string bp, bool state);
         void breakFileLine(const std::string &filename, int line);
         void breakDelete(const std::string &number);
@@ -239,19 +240,22 @@ class GDB
         void parseConsoleStreamOutput(GDBOutput *o, std::string &str);
         void parseConsoleOutput(GDBOutput *o, std::string &str);
         void parseResults(GDBOutput *o, std::string &str);
-        GDBResult *parseResult(std::string &str, GDBResult *pres = NULL);
-        void parseString(GDBResult *o, std::string &str);
-        void parseTuple(GDBResult *o, std::string &str);
-        void parseList(GDBResult *o, std::string &str);
+        GDBResult *parseResult(std::string &str, GDBResult *pres, size_t &index);
+        void parseString(GDBResult *o, std::string &str, size_t &index);
+        void parseTuple(GDBResult *o, std::string &str, size_t &index);
+        void parseList(GDBResult *o, std::string &str, size_t &index);
         GDBResult *sendCommandAndWaitForResult(std::string command, std::string resultName);
 
         GDBBreakpoint *findBreakpoint(std::string bp);
+        GDBBreakpoint *findBreakpoint(std::string file, int line);
         void addOrUpdateBreakpoint(GDBOutput *o);
+        void getNearestExecutableLine(const std::string &filename, std::string & line);
         void deleteBreakpoint(const std::string &bp);
 
         GDBOutput *getResultRecord(GDBOutput *o);
         GDBOutput *getNextResultRecordWithData(GDBOutput *o);
         GDBStopResult *getStopResult(GDBOutput *o);
+        void stopped(GDBStopResult *s);
         bool checkResultDone();
         bool checkResult(GDB_MESSAGE_CLASS c);
 

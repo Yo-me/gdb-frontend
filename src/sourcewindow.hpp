@@ -20,6 +20,9 @@ class SourceWindow
         
         TextEditor m_sourceView;
         bool m_isFocused;
+        TextEditor::Breakpoints m_breakpoints;
+
+        void addBreakPoint(int line);
 
     public:
         SourceWindow(GDB *gdb);

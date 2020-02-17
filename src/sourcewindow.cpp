@@ -9,13 +9,18 @@ SourceWindow::SourceWindow(GDB *gdb)
 
     m_sourceView.SetPalette(TextEditor::GetDarkPalette());
     m_sourceView.SetReadOnly(true);
+    m_sourceView.SetAddBreakPointHandler(std::bind(SourceWindow::addBreakPoint, this, std::placeholders::_1));
+}
+
+void SourceWindow::addBreakPoint(int line)
+{
+    m_gdb->breakFileLine(this->m_currentFileName, line);
 }
 
 void SourceWindow::draw()
 {
     if(ImGui::Begin("Source File", NULL, ImGuiWindowFlags_NoCollapse))
     {
-        TextEditor::Breakpoints breakpoints;
         ImVec2 textSize;
         int nbLines;
         float lineNumbersColumnWidth;
@@ -41,15 +46,14 @@ void SourceWindow::draw()
             }
             this->m_sourceView.SetText(this->m_currentFileContent.str());
         }
-        bpMap = this->m_gdb->getBreakpoints(this->m_currentFileName);
-
-        for(auto bp : *bpMap)
+        std::vector<GDBBreakpoint *> breakpoints = this->m_gdb->getBreakpoints(this->m_currentFileName);
+        m_breakpoints.clear();
+        for(auto bp : breakpoints)
         {
-            if(bp.second->enabled)
-                breakpoints.insert(bp.first);
+            m_breakpoints[bp->line] = bp->enabled;
         }
 
-        m_sourceView.SetBreakpoints(breakpoints);
+        m_sourceView.SetBreakpoints(m_breakpoints);
 
         if(this->m_gdb->getCurrentSourceLine() != -1 && this->m_currentSourceLine != this->m_gdb->getCurrentSourceLine()-1)
         {

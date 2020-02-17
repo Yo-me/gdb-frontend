@@ -65,7 +65,7 @@ public:
 		Coordinates(int aLine, int aColumn) : mLine(aLine), mColumn(aColumn)
 		{
 			assert(aLine >= 0);
-			assert(aColumn >= 0);
+			//assert(aColumn >= 0);
 		}
 		static Coordinates Invalid() { static Coordinates invalid(-1, -1); return invalid; }
 
@@ -122,9 +122,10 @@ public:
 	typedef std::unordered_map<std::string, Identifier> Identifiers;
 	typedef std::unordered_set<std::string> Keywords;
 	typedef std::map<int, std::string> ErrorMarkers;
-	typedef std::unordered_set<int> Breakpoints;
+	typedef std::map<int, bool> Breakpoints;
 	typedef std::array<ImU32, (unsigned)PaletteIndex::Max> Palette;
 	typedef char Char;
+	typedef void (*addBreakPointHandler)(int lineNumber);
 	
 	struct Glyph
 	{
@@ -177,6 +178,8 @@ public:
 
 	TextEditor();
 	~TextEditor();
+
+	void SetAddBreakPointHandler(std::function<void(int)> handler);
 
 	void SetLanguageDefinition(const LanguageDefinition& aLanguageDef);
 	const LanguageDefinition& GetLanguageDefinition() const { return mLanguageDefinition; }
@@ -330,6 +333,8 @@ private:
 	bool mScrollToCursor;
 	bool mScrollToTop;
 	bool mTextChanged;
+	bool mLineNumbersHovered;
+	int  mHoveredLine;
 	float  mTextStart;                   // position (in pixels) where a code line starts relative to the left of the TextEditor.
 	int  mLeftMargin;
 	bool mCursorPositionChanged;
@@ -348,4 +353,6 @@ private:
 	Coordinates mInteractiveStart, mInteractiveEnd;
 	
 	float mLastClick;
+
+	std::function<void(int)> mAddBreakPointHandler;
 };

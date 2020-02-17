@@ -1,20 +1,11 @@
 #include "gdb.hpp"
+#include "utils.hpp"
 
 #include <sstream>
 #include <ostream>
 #include <iostream>
 #include <string>
 #include <regex>
-
-static void replaceAll(std::string& str, const std::string& from, const std::string& to) {
-
-    std::regex e(from);
-    while(std::regex_search(str, e))
-    {
-        str = std::regex_replace(str, e, to);
-    }
-}
-
 static GDBResult *findResult(GDBOutput *o, const std::string &name)
 {
     for(std::vector<GDBResult *>::iterator it = o->rs.begin(); it != o->rs.end(); it++)
@@ -26,17 +17,10 @@ static GDBResult *findResult(GDBOutput *o, const std::string &name)
     return NULL;
 }
 
-static std::string basename(std::string filename)
-{
-    size_t basename_start = filename.find_last_of("/\\", std::string::npos);
-    if(basename_start != std::string::npos)
-        return filename.substr(basename_start + 1);
-    else
-        return filename;
-}
+
 
 GDB::GDB():
-    m_state(GDB_STATE_STOPPED),
+    m_state(GDB_STATE_INIT),
     m_currentFile(""),
     m_currentSourceLine(-1)
 {
@@ -123,7 +107,7 @@ GDBResult *GDB::sendCommandAndWaitForResult(std::string command, std::string res
             }
             else
             {
-                foundResponse = this->getNextResultRecordWithData(foundResponse);
+                foundResponse = this->getNextResultRecordWithData(foundResponse->next);
             }
             
         }
@@ -172,32 +156,39 @@ void GDB::computeFrameStack()
     }
 }
 
+void GDB::stopped(GDBStopResult *s)
+{
+    if(s)
+    {
+        if(s->reason != GDB_STOP_REASON_UNKNOWN)
+        {
+            this->m_state = GDB_STATE_STOPPED;
+            if(s->frame)
+            {
+                this->m_currentFile = s->frame->fullname;
+                this->m_currentSourceLine = s->frame->line;
+            }
+            else
+            {
+                this->m_currentFile = "";
+                this->m_currentSourceLine = -1;
+            }
+            this->m_currentFrameLevel = 0;
+        }
+    }
+}
+
 void GDB::poll(void)
 {
     GDBOutput *rsp = this->getResponse();
     if(rsp)
     {
         GDBStopResult *s = this->getStopResult(rsp);
-        if(s)
+
+        this->stopped(s);
+        if(this->m_state == GDB_STATE_STOPPED)
         {
-            if(s->reason != GDB_STOP_REASON_UNKNOWN)
-            {
-                this->m_state = GDB_STATE_STOPPED;
-                if(s->frame)
-                {
-                    this->m_currentFile = s->frame->fullname;
-                    this->m_currentSourceLine = s->frame->line;
-                }
-                else
-                {
-                    this->m_currentFile = "";
-                    this->m_currentSourceLine = -1;
-                }
-                this->m_currentFrameLevel = 0;
-                this->computeFrameStack();
-            }
-            delete(s->frame);
-            delete(s);
+            this->computeFrameStack();
         }
         this->freeOutput(rsp);
     }
@@ -226,12 +217,16 @@ GDBOutput *GDB::getResponse()
             o = this->parseOutput(output);
             if(o)
             {
+                this->stopped(this->getStopResult(o));
                 if(o->t == GDB_TYPE_OUT_OF_BAND && o->st == GDB_SUBTYPE_STREAM)
                 {
                     add = false;
                     switch(o->sst)
                     {
                         case GDB_SUBSUBTYPE_CONSOLE:
+                            replaceAll(o->rs[0]->cstr, "(^|[^\\\\])\\\\n", "$1\n");
+                            replaceAll(o->rs[0]->cstr, "(^|[^\\\\])\\\\t", "$1\t");
+                            replaceAll(o->rs[0]->cstr, "\\\\\"", "\"");
                             this->m_consoleStream << o->rs[0]->cstr;
                             break;
                     }
@@ -247,9 +242,9 @@ GDBOutput *GDB::getResponse()
                     add = false;
                     this->deleteBreakpoint(res->cstr);
                 }
-                else
+                else if(o->cl == GDB_CLASS_RUNNING)
                 {
-
+                    this->m_state = GDB_STATE_RUNNING;
                 }
             }
             else
@@ -431,26 +426,26 @@ void GDB::parseConsoleOutput(GDBOutput *o, std::string &str)
     this->parseResults(o, str);
 }
 
-void GDB::parseString(GDBResult *res, std::string &str)
+void GDB::parseString(GDBResult *res, std::string &str, size_t &index)
 {
-    if(str[0] != '\"')
+    if(str[index] != '\"')
         return;
     else
     {
-        std::regex r("[^\\\\]\"");
-        std::smatch match;
-
-        str.erase(0, 1);
-        if(std::regex_search(str, match, r))
+         index++;   
         {
-            size_t endPos = match.position(0)+1;
             res->vt = GDB_VALUE_TYPE_CONST;
-            res->cstr = str.substr(0, endPos);
-            replaceAll(res->cstr, "\\\\\"", "\"");
-            replaceAll(res->cstr, "(^|[^\\\\])\\\\n", "$1\n");
-            replaceAll(res->cstr, "(^|[^\\\\])\\\\t", "$1\t");
-            replaceAll(res->cstr, "\\\\\\\\", "\\");
-            str.erase(0, endPos+1);
+
+            while(index < str.size() && (str[index] != '"' || str[index-1] == '\\'))
+            {
+                res->cstr += str[index];
+                index++;
+            }
+            //replaceAll(res->cstr, "\\\\\"", "\"");
+            //replaceAll(res->cstr, "(^|[^\\\\])\\\\n", "$1\n");
+            //replaceAll(res->cstr, "(^|[^\\\\])\\\\t", "$1\t");
+            //replaceAll(res->cstr, "\\\\\\\\", "\\");
+            index++;
         }
     }
 }
@@ -661,26 +656,26 @@ void GDB::freeOutput(GDBOutput *o)
     }
 }
 
-void GDB::parseTuple(GDBResult *res, std::string &str)
+void GDB::parseTuple(GDBResult *res, std::string &str, size_t &index)
 {
     res->vt = GDB_VALUE_TYPE_TUPLE;
-    if(str[0] == '{')
+    if(str[index] == '{')
     {
-        str.erase(0, 1);
-        if(str[0] == '}')
+        index++;
+        if(str[index] == '}')
         {
-            str.erase(0, 1);
+            index++;
             return;
         }
 
         do
         {
-            GDBResult *next_res = this->parseResult(str);
+            GDBResult *next_res = this->parseResult(str, NULL, index);
 
             res->mp[next_res->var] = next_res;
-        } while(str[0] != '}' && str[0] != '\0');
-        if(str[0] == '}')
-            str.erase(0, 1);
+        } while(str[index] != '}' && str[index] != '\0');
+        if(str[index] == '}')
+            index++;
     }
     else
     {
@@ -690,25 +685,25 @@ void GDB::parseTuple(GDBResult *res, std::string &str)
 
 }
 
-void GDB::parseList(GDBResult *res, std::string &str)
+void GDB::parseList(GDBResult *res, std::string &str, size_t &index)
 {
     res->vt = GDB_VALUE_TYPE_LIST;
-    if(str[0] == '[')
+    if(str[index] == '[')
     {
-        str.erase(0, 1);
-        if(str[0] == ']')
+        index++;
+        if(str[index] == ']')
         {
-            str.erase(0, 1);
+            index++;
             return;
         }
         do
         {
-            GDBResult *next_res = this->parseResult(str);
+            GDBResult *next_res = this->parseResult(str, NULL, index);
 
             res->vec.push_back(next_res);
-        } while(str[0] != ']' && str[0] != '\0');
-        if(str[0] == ']')
-            str.erase(0, 1);
+        } while(str[index] != ']' && str[index] != '\0');
+        if(str[index] == ']')
+            index++;
     }
     else
     {
@@ -763,9 +758,10 @@ void dumpRes(GDBResult *res, int indentlevel = 0)
 void GDB::parseResults(GDBOutput *o, std::string &str)
 {
     GDBResult *res;
+    size_t index = 0;
     do
     {
-        res = this->parseResult(str);
+        res = this->parseResult(str, NULL, index);
         if(res)
             o->rs.push_back(res);
     } while(res);
@@ -775,15 +771,15 @@ void GDB::parseResults(GDBOutput *o, std::string &str)
 
 }
 
-GDBResult *GDB::parseResult(std::string &str, GDBResult *pres)
+GDBResult *GDB::parseResult(std::string &str, GDBResult *pres, size_t &index)
 {
     char first;
     GDBResult *res = NULL;
-    if(str[0] != '\0')
+    if(str[index] != '\0')
     {
         size_t endPos;
-        if(str[0] == ',')
-            str.erase(0, 1);
+        if(str[index] == ',')
+            index++;
         {
             if(pres)
                 res = pres;
@@ -791,34 +787,38 @@ GDBResult *GDB::parseResult(std::string &str, GDBResult *pres)
                 res = new GDBResult();
             if(res)
             {
-                if(str[0] == '\"')
+                if(str[index] == '\"')
                 {
-                    this->parseString(res, str);
+                    this->parseString(res, str, index);
                 }
-                else if(str[0])
+                else if(str[index])
                 {
-                    first = str[0];
+                    first = str[index];
                     if(first == '[')
                     {
-                        this->parseList(res, str);
+                        this->parseList(res, str, index);
                     }
                     else if(first == '{')
                     {
-                        this->parseTuple(res, str);
+                        this->parseTuple(res, str, index);
                     }
                     else if(first == '\"')
                     {
-                        this->parseString(res, str);
+                        this->parseString(res, str, index);
                     }
                     else
                     {
-                        endPos = str.find('=');
+                        while(index < str.size() && str[index] != '=')
+                        {
+                           res->var += str[index];
+                           index++; 
+                        }
 
-                        if(endPos == std::string::npos)
+                        if(index == str.size())
                             return NULL;
-                        res->var = str.substr(0, endPos);
-                        str.erase(0, endPos+1 /* +1 to erase the = sign */ );
-                        this->parseResult(str, res);
+
+                        index++;
+                        this->parseResult(str, res, index);
                     }
                 }
             }
@@ -829,6 +829,47 @@ GDBResult *GDB::parseResult(std::string &str, GDBResult *pres)
         return NULL;
     }
     return res;
+}
+
+void GDB::getNearestExecutableLine(const std::string &filename, std::string & line)
+{
+    std::ostringstream cmd;
+    GDBResult *execLinesResult;
+    bool found = false;
+    int index = 0;
+    cmd << "-symbol-list-lines ";
+    cmd << basename(filename);
+    cmd << "\n";
+    execLinesResult = this->sendCommandAndWaitForResult(cmd.str(), "lines");
+
+    {
+        GDBResult dummy;
+        GDBResult dummy2;
+        dummy.mp["line"] = &dummy2;
+        dummy.mp["line"]->cstr = line;
+
+        std::stable_sort(execLinesResult->vec.begin(), execLinesResult->vec.end(), [](GDBResult *a, GDBResult *b){
+            if(a->mp["line"]->cstr < b->mp["line"]->cstr)
+            {
+                return true;
+            }
+            //else if(a->mp["line"]->cstr == b->mp["line"]->cstr)
+            //{
+            //    return a->mp["pc"]->cstr < b->mp["pc"]->cstr;
+            //}
+            else
+            {
+                return false;
+            }
+        });
+        auto lineIt = std::lower_bound(execLinesResult->vec.begin(), execLinesResult->vec.end(), &dummy, 
+            [](GDBResult *a, GDBResult *b) {
+                return a->mp["line"]->cstr < b->mp["line"]->cstr;
+            });
+        line = (*lineIt)->mp["line"]->cstr;
+    }
+
+    this->freeResult(execLinesResult);
 }
 
 void GDB::addOrUpdateBreakpoint(GDBOutput *o)
@@ -851,28 +892,33 @@ void GDB::addOrUpdateBreakpoint(GDBOutput *o)
 
     if(bp)
     {
-
-        bp->number = res->mp["number"]->cstr;
-        bp->enabled = res->mp["enabled"]->cstr == "y" ? true : false;
-
         if(res->mp["fullname"])
         {
             bp->fullname = res->mp["fullname"]->cstr;
         }
 
-        if(res->mp["file"])
-        {
-            bp->filename = res->mp["file"]->cstr;
-        }
-
-        if(res->mp["line"])
-        {
-            bp->line = stoi(res->mp["line"]->cstr);
-        }
+        bp->enabled = res->mp["enabled"]->cstr == "y" ? true : false;
+        
 
         bp->times = stoi(res->mp["times"]->cstr);
+
         if(add)
+        {
             this->m_breakpoints.push_back(bp);
+
+            bp->number = res->mp["number"]->cstr;
+
+            if(res->mp["file"])
+            {
+                bp->filename = res->mp["file"]->cstr;
+            }
+
+            if(res->mp["line"])
+            {
+                bp->line = stoi(res->mp["line"]->cstr);
+            }
+        }
+
     }
 }
 
@@ -893,26 +939,42 @@ const std::vector<GDBBreakpoint *> &GDB::getBreakpoints(void)
     return this->m_breakpoints;
 }
 
-std::map<int, GDBBreakpoint *> *GDB::getBreakpoints(std::string filename)
+std::vector<GDBBreakpoint *> GDB::getBreakpoints(std::string filename)
 {
-    std::map<int, GDBBreakpoint *> *mp = new std::map<int, GDBBreakpoint *>();
-    if(mp)
+    std::vector<GDBBreakpoint *> fileBreakpoints;
+
+    for(auto it = this->m_breakpoints.begin(); it != this->m_breakpoints.end(); it++)
     {
-        for(auto it = this->m_breakpoints.begin(); it != this->m_breakpoints.end(); it++)
+        if((*it)->fullname == filename)
         {
-            if((*it)->fullname == filename)
-            {
-                (*mp)[(*it)->line] = *it;
-            }
+            fileBreakpoints.push_back(*it);
         }
     }
 
-    return mp;
+    return fileBreakpoints;
 }
 
 GDBBreakpoint *GDB::findBreakpoint(std::string bp)
 {
     std::vector<GDBBreakpoint *>::iterator it = std::find_if(this->m_breakpoints.begin(), this->m_breakpoints.end(), [bp](const auto &v){ return v->number == bp;});
+
+    if(it != this->m_breakpoints.end())
+    {
+        return *it;
+    }
+    else
+    {
+        return NULL;
+    }
+
+}
+
+GDBBreakpoint *GDB::findBreakpoint(std::string file, int line)
+{
+    std::vector<GDBBreakpoint *>::iterator it = std::find_if(this->m_breakpoints.begin(), this->m_breakpoints.end(),
+        [file, line](const auto &v){
+            return (v->line == line && v->fullname == file);
+        });
 
     if(it != this->m_breakpoints.end())
     {
@@ -953,19 +1015,34 @@ void GDB::setBreakpointState(std::string bp, bool state)
 
 void GDB::breakFileLine(const std::string &filename, int line)
 {
-    GDBOutput *o;
-    std::ostringstream cmd;
+    GDBBreakpoint *bp;
+    std::string sline = std::to_string(line);
+    this->getNearestExecutableLine(filename, sline);
 
-    cmd << "-break-insert " << basename(filename) << ":" << line << "\n";
-    this->send(cmd.str());
+    line = stoi(sline);
 
-    o = this->getResponseBlk();
-
-    if(o && o->t == GDB_TYPE_RESULT_RECORD && o->cl == GDB_CLASS_DONE)
+    if(bp = this->findBreakpoint(filename, line))
     {
-        this->addOrUpdateBreakpoint(o);
-        this->freeOutput(o);
+        this->breakDelete(bp->number);
     }
+    else
+    {    
+        GDBOutput *o;
+        std::ostringstream cmd;
+
+        cmd << "-break-insert " << basename(filename) << ":" << line << "\n";
+        this->send(cmd.str());
+        o = this->getResponseBlk();
+
+        if(o && o->t == GDB_TYPE_RESULT_RECORD && o->cl == GDB_CLASS_DONE)
+        {
+            this->addOrUpdateBreakpoint(o);
+            this->freeOutput(o);
+        }
+    }
+    
+
+
 }
 
 void GDB::breakDelete(const std::string &number)
@@ -981,6 +1058,8 @@ void GDB::breakDelete(const std::string &number)
         this->deleteBreakpoint(number);
     }
 }
+
+
 
 std::map<int, bool> *GDB::getExecutableLines(const std::string &filename)
 {
@@ -1021,13 +1100,12 @@ void GDB::resume()
 {
     if(m_state == GDB_STATE_STOPPED)
     {
-        GDBOutput *rsp;
 
         this->send("-exec-continue\n");
 
-        rsp = this->getResponse();
-
-        delete rsp;
+        //rsp = this->getResponse();
+//
+        //delete rsp;
     }
 }
 

@@ -4,6 +4,8 @@
 #include <regex>
 #include <cmath>
 
+#include <iostream>
+
 #include "TextEditor.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -43,6 +45,8 @@ TextEditor::TextEditor()
 	, mSelectionMode(SelectionMode::Normal)
 	, mCheckComments(true)
 	, mLastClick(-1.0f)
+	, mLineNumbersHovered(false)
+	, mAddBreakPointHandler(NULL)
 {
 	SetPalette(GetDarkPalette());
 	SetLanguageDefinition(LanguageDefinition::HLSL());
@@ -116,6 +120,11 @@ TextEditor::Coordinates TextEditor::SanitizeCoordinates(const Coordinates & aVal
 	auto line = aValue.mLine;
 	auto column = aValue.mColumn;
 
+	if(column < 0)
+	{
+		column = 0;
+	}
+
 	if (line >= (int)mLines.size())
 	{
 		if (mLines.empty())
@@ -131,7 +140,7 @@ TextEditor::Coordinates TextEditor::SanitizeCoordinates(const Coordinates & aVal
 	}
 	else
 	{
-		column = mLines.empty() ? 0 : std::min((int)mLines[line].size(), aValue.mColumn);
+		column = mLines.empty() ? 0 : std::min((int)mLines[line].size(), column);
 	}
 
 	return Coordinates(line, column);
@@ -258,25 +267,32 @@ TextEditor::Coordinates TextEditor::ScreenPosToCoordinates(const ImVec2& aPositi
 
 	if (lineNo >= 0 && lineNo < (int)mLines.size())
 	{
-		auto& line = mLines.at(lineNo);
-
-		// First we find the hovered column coord.
-		while (mTextStart + cumulatedStringWidth[0] < local.x &&
-			(size_t)columnCoord < line.size())
+		if(mTextStart + cumulatedStringWidth[0] > local.x)
 		{
-			cumulatedStringWidth[1] = cumulatedStringWidth[0];
-			cumulatedString += line[columnCoord].mChar;
-			cumulatedStringWidth[0] = ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, cumulatedString.c_str(), nullptr, nullptr).x;
-			columnWidth = (cumulatedStringWidth[0] - cumulatedStringWidth[1]);
-			columnCoord++;
+			columnCoord = -1;
 		}
+		else
+		{
+			auto& line = mLines.at(lineNo);
 
-		// Then we reduce by 1 column coord if cursor is on the left side of the hovered column.
-		if (mTextStart + cumulatedStringWidth[0] - columnWidth / 2.0f > local.x)
-			columnCoord = std::max(0, columnCoord - 1);
+			// First we find the hovered column coord.
+			while (mTextStart + cumulatedStringWidth[0] < local.x &&
+				(size_t)columnCoord < line.size())
+			{
+				cumulatedStringWidth[1] = cumulatedStringWidth[0];
+				cumulatedString += line[columnCoord].mChar;
+				cumulatedStringWidth[0] = ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, cumulatedString.c_str(), nullptr, nullptr).x;
+				columnWidth = (cumulatedStringWidth[0] - cumulatedStringWidth[1]);
+				columnCoord++;
+			}
+
+			// Then we reduce by 1 column coord if cursor is on the left side of the hovered column.
+			if (mTextStart + cumulatedStringWidth[0] - columnWidth / 2.0f > local.x)
+				columnCoord = std::max(0, columnCoord - 1);			
+		}
 	}
 
-	return SanitizeCoordinates(Coordinates(lineNo, columnCoord));
+	return  Coordinates(lineNo, columnCoord);//SanitizeCoordinates(Coordinates(lineNo, columnCoord));
 }
 
 TextEditor::Coordinates TextEditor::FindWordStart(const Coordinates & aFrom) const
@@ -335,82 +351,82 @@ bool TextEditor::IsOnWordBoundary(const Coordinates & aAt) const
 
 void TextEditor::RemoveLine(int aStart, int aEnd)
 {
-	assert(!mReadOnly);
-	assert(aEnd >= aStart);
-	assert(mLines.size() > (size_t)(aEnd - aStart));
-
-	ErrorMarkers etmp;
-	for (auto& i : mErrorMarkers)
-	{
-		ErrorMarkers::value_type e(i.first >= aStart ? i.first - 1 : i.first, i.second);
-		if (e.first >= aStart && e.first <= aEnd)
-			continue;
-		etmp.insert(e);
-	}
-	mErrorMarkers = std::move(etmp);
-
-	Breakpoints btmp;
-	for (auto i : mBreakpoints)
-	{
-		if (i >= aStart && i <= aEnd)
-			continue;
-		btmp.insert(i >= aStart ? i - 1 : i);
-	}
-	mBreakpoints = std::move(btmp);
-
-	mLines.erase(mLines.begin() + aStart, mLines.begin() + aEnd);
-	assert(!mLines.empty());
-
-	mTextChanged = true;
+	//assert(!mReadOnly);
+	//assert(aEnd >= aStart);
+	//assert(mLines.size() > (size_t)(aEnd - aStart));
+//
+	//ErrorMarkers etmp;
+	//for (auto& i : mErrorMarkers)
+	//{
+	//	ErrorMarkers::value_type e(i.first >= aStart ? i.first - 1 : i.first, i.second);
+	//	if (e.first >= aStart && e.first <= aEnd)
+	//		continue;
+	//	etmp.insert(e);
+	//}
+	//mErrorMarkers = std::move(etmp);
+//
+	//Breakpoints btmp;
+	//for (auto i : mBreakpoints)
+	//{
+	//	if (i >= aStart && i <= aEnd)
+	//		continue;
+	//	btmp.insert(i >= aStart ? i - 1 : i);
+	//}
+	//mBreakpoints = std::move(btmp);
+//
+	//mLines.erase(mLines.begin() + aStart, mLines.begin() + aEnd);
+	//assert(!mLines.empty());
+//
+	//mTextChanged = true;
 }
 
 void TextEditor::RemoveLine(int aIndex)
 {
-	assert(!mReadOnly);
-	assert(mLines.size() > 1);
-
-	ErrorMarkers etmp;
-	for (auto& i : mErrorMarkers)
-	{
-		ErrorMarkers::value_type e(i.first > aIndex ? i.first - 1 : i.first, i.second);
-		if (e.first - 1 == aIndex)
-			continue;
-		etmp.insert(e);
-	}
-	mErrorMarkers = std::move(etmp);
-
-	Breakpoints btmp;
-	for (auto i : mBreakpoints)
-	{
-		if (i == aIndex)
-			continue;
-		btmp.insert(i >= aIndex ? i - 1 : i);
-	}
-	mBreakpoints = std::move(btmp);
-
-	mLines.erase(mLines.begin() + aIndex);
-	assert(!mLines.empty());
-
-	mTextChanged = true;
+	//assert(!mReadOnly);
+	//assert(mLines.size() > 1);
+//
+	//ErrorMarkers etmp;
+	//for (auto& i : mErrorMarkers)
+	//{
+	//	ErrorMarkers::value_type e(i.first > aIndex ? i.first - 1 : i.first, i.second);
+	//	if (e.first - 1 == aIndex)
+	//		continue;
+	//	etmp.insert(e);
+	//}
+	//mErrorMarkers = std::move(etmp);
+//
+	//Breakpoints btmp;
+	//for (auto i : mBreakpoints)
+	//{
+	//	if (i == aIndex)
+	//		continue;
+	//	btmp.insert(i >= aIndex ? i - 1 : i);
+	//}
+	//mBreakpoints = std::move(btmp);
+//
+	//mLines.erase(mLines.begin() + aIndex);
+	//assert(!mLines.empty());
+//
+	//mTextChanged = true;
 }
 
 TextEditor::Line& TextEditor::InsertLine(int aIndex)
 {
-	assert(!mReadOnly);
-
-	auto& result = *mLines.insert(mLines.begin() + aIndex, Line());
-
-	ErrorMarkers etmp;
-	for (auto& i : mErrorMarkers)
-		etmp.insert(ErrorMarkers::value_type(i.first >= aIndex ? i.first + 1 : i.first, i.second));
-	mErrorMarkers = std::move(etmp);
-
-	Breakpoints btmp;
-	for (auto i : mBreakpoints)
-		btmp.insert(i >= aIndex ? i + 1 : i);
-	mBreakpoints = std::move(btmp);
-
-	return result;
+	//assert(!mReadOnly);
+//
+	//auto& result = *mLines.insert(mLines.begin() + aIndex, Line());
+//
+	//ErrorMarkers etmp;
+	//for (auto& i : mErrorMarkers)
+	//	etmp.insert(ErrorMarkers::value_type(i.first >= aIndex ? i.first + 1 : i.first, i.second));
+	//mErrorMarkers = std::move(etmp);
+//
+	//Breakpoints btmp;
+	//for (auto i : mBreakpoints)
+	//	btmp.insert(i >= aIndex ? i + 1 : i);
+	//mBreakpoints = std::move(btmp);
+//
+	//return result;
 }
 
 std::string TextEditor::GetWordUnderCursor() const
@@ -462,7 +478,12 @@ void TextEditor::HandleKeyboardInputs()
 	if (ImGui::IsWindowFocused())
 	{
 		if (ImGui::IsWindowHovered())
-			ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+		{
+			if(mLineNumbersHovered)
+				ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
+			else
+				ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+		}
 		//ImGui::CaptureKeyboardFromApp(true);
 
 		io.WantCaptureKeyboard = true;
@@ -551,16 +572,27 @@ void TextEditor::HandleMouseInputs()
 			auto doubleClick = ImGui::IsMouseDoubleClicked(0);
 			auto t = ImGui::GetTime();
 			auto tripleClick = click && !doubleClick && (mLastClick != -1.0f && (t - mLastClick) < io.MouseDoubleClickTime);
+			Coordinates coords = ScreenPosToCoordinates(ImGui::GetMousePos());
+
+			if(coords.mColumn < 0)
+			{
+				mLineNumbersHovered = true;
+				mHoveredLine = coords.mLine;
+			}
+			else
+			{
+				mLineNumbersHovered = false;
+			}
 
 			/*
 				Left mouse button triple click
 			*/
-
 			if (tripleClick)
 			{
 				if (!ctrl)
 				{
-					mState.mCursorPosition = mInteractiveStart = mInteractiveEnd = SanitizeCoordinates(ScreenPosToCoordinates(ImGui::GetMousePos()));
+					
+					mInteractiveStart = mInteractiveEnd = SanitizeCoordinates(coords);
 					mSelectionMode = SelectionMode::Line;
 					SetSelection(mInteractiveStart, mInteractiveEnd, mSelectionMode);
 				}
@@ -576,12 +608,13 @@ void TextEditor::HandleMouseInputs()
 			{
 				if (!ctrl)
 				{
-					mState.mCursorPosition = mInteractiveStart = mInteractiveEnd = SanitizeCoordinates(ScreenPosToCoordinates(ImGui::GetMousePos()));
+					// mState.mCursorPosition = 
+					mInteractiveStart = mInteractiveEnd = SanitizeCoordinates(coords);
 					if (mSelectionMode == SelectionMode::Line)
 						mSelectionMode = SelectionMode::Normal;
 					else
 						mSelectionMode = SelectionMode::Word;
-					SetSelection(mInteractiveStart, mInteractiveEnd, mSelectionMode);
+					SetSelection(mInteractiveStart, mInteractiveEnd, mSelectionMode);						
 				}
 
 				mLastClick = (float)ImGui::GetTime();
@@ -592,7 +625,15 @@ void TextEditor::HandleMouseInputs()
 			*/
 			else if (click)
 			{
-				mState.mCursorPosition = mInteractiveStart = mInteractiveEnd = SanitizeCoordinates(ScreenPosToCoordinates(ImGui::GetMousePos()));
+				if(mLineNumbersHovered)
+				{
+					if(mAddBreakPointHandler)
+					{
+						mAddBreakPointHandler(coords.mLine + 1);
+					}
+				}
+				// mState.mCursorPosition = 
+				mInteractiveStart = mInteractiveEnd = SanitizeCoordinates(coords);
 				if (ctrl)
 					mSelectionMode = SelectionMode::Word;
 				else
@@ -605,7 +646,8 @@ void TextEditor::HandleMouseInputs()
 			else if (ImGui::IsMouseDragging(0) && ImGui::IsMouseDown(0))
 			{
 				io.WantCaptureMouse = true;
-				mState.mCursorPosition = mInteractiveEnd = SanitizeCoordinates(ScreenPosToCoordinates(ImGui::GetMousePos()));
+				//mState.mCursorPosition =
+				mInteractiveEnd = SanitizeCoordinates(coords);
 				SetSelection(mInteractiveStart, mInteractiveEnd, mSelectionMode);
 			}
 		}
@@ -691,11 +733,36 @@ void TextEditor::Render()
 			// Draw breakpoints
 			auto start = ImVec2(lineStartScreenPos.x + scrollX, lineStartScreenPos.y);
 
-			if (mBreakpoints.count(lineNo + 1) != 0)
+			try
 			{
-				auto end = ImVec2(lineStartScreenPos.x + contentSize.x + 2.0f * scrollX, lineStartScreenPos.y + mCharAdvance.y);
-				drawList->AddRectFilled(start, end, mPalette[(int)PaletteIndex::Breakpoint]);
+				{
+					ImVec2 center;
+					float halfAdvance = mCharAdvance.x / 2.0;
+					bool enabled = mBreakpoints.at(lineNo + 1);
+					
+					center.x = lineStartScreenPos.x + halfAdvance + 1;
+					center.y = lineStartScreenPos.y + mCharAdvance.y / 2.0;
+
+					if(enabled)
+					{
+						drawList->AddCircleFilled(center, halfAdvance, 0xFF0000FF);
+					}
+					else
+					{
+						drawList->AddCircle(center, halfAdvance, 0xFF0000FF, 12, 2.0);	
+					}	
+				}
+				//{
+				//	auto end = ImVec2(lineStartScreenPos.x + contentSize.x + 2.0f * scrollX, lineStartScreenPos.y + mCharAdvance.y);
+				//	drawList->AddRectFilled(start, end, mPalette[(int)PaletteIndex::Breakpoint]);
+				//}	
 			}
+			catch(const std::out_of_range& e)
+			{
+				
+			}
+			
+			
 
 			// Draw error markers
 			auto errorIt = mErrorMarkers.find(lineNo + 1);
@@ -724,10 +791,22 @@ void TextEditor::Render()
 			auto lineNoWidth = ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, buf, nullptr, nullptr).x;
 			drawList->AddText(ImVec2(lineStartScreenPos.x + mTextStart - lineNoWidth, lineStartScreenPos.y), mPalette[(int)PaletteIndex::LineNumber], buf);
 
+			if(mLineNumbersHovered && lineNo == mHoveredLine) 
+			{
+				ImVec2 center;
+				float halfAdvance = mCharAdvance.x / 2.0;
+				center.x = lineStartScreenPos.x + halfAdvance + 1;
+				center.y = lineStartScreenPos.y + mCharAdvance.y / 2.0;
+
+				drawList->AddCircleFilled(center, halfAdvance, 0xAA0000FF);
+			}
+
 			// Highlight the current line (where the cursor is)
 			if (mState.mCursorPosition.mLine == lineNo)
 			{
-				auto focused = ImGui::IsWindowFocused();
+				/* Force display of current line has if window is never focused */
+				auto focused = false; //ImGui::IsWindowFocused();
+
 
 				if (!HasSelection())
 				{
@@ -793,7 +872,7 @@ void TextEditor::Render()
 		// Draw a tooltip on known identifiers/preprocessor symbols
 		if (ImGui::IsMousePosValid())
 		{
-			auto id = GetWordAt(ScreenPosToCoordinates(ImGui::GetMousePos()));
+			auto id = GetWordAt(SanitizeCoordinates(ScreenPosToCoordinates(ImGui::GetMousePos())));
 			if (!id.empty())
 			{
 				auto it = mLanguageDefinition.mIdentifiers.find(id);
@@ -2735,4 +2814,10 @@ const TextEditor::LanguageDefinition& TextEditor::LanguageDefinition::Lua()
 		inited = true;
 	}
 	return langDef;
+}
+
+
+void TextEditor::SetAddBreakPointHandler(std::function<void(int)> handler)
+{
+	mAddBreakPointHandler = handler;
 }
