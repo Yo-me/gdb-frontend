@@ -166,6 +166,13 @@ void MainWindow::draw(void)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(2.0f, 2.0f));
 
     ImGui::Begin("MainWindow", NULL, window_flags);
+    ImGui::BeginMenuBar();
+    if(ImGui::MenuItem("Stop", "", (bool *)NULL, this->m_gdb->getState() == GDB_STATE_RUNNING))
+    {
+        this->m_gdb->interrupt();
+    }
+
+    ImGui::EndMenuBar();
     ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
 
     ImGui::End();

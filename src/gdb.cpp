@@ -896,8 +896,6 @@ void GDB::addOrUpdateBreakpoint(GDBOutput *o)
     bool add = true;
     bp = this->findBreakpoint(res->mp["number"]->cstr);
 
-
-
     if(!bp)
     {
         bp = new GDBBreakpoint();
@@ -1293,4 +1291,10 @@ void GDB::run()
 const std::vector<GDBFrame> &GDB::getFrameStack()
 {
     return this->m_stackFrame;
+}
+
+void GDB::interrupt()
+{
+    GDBOutput *rsp;
+    this->send("-exec-interrupt\n");
 }

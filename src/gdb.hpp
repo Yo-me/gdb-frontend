@@ -241,6 +241,7 @@ class GDB
         void step();
         void finish();
         void run();
+        void interrupt();
         void computeFrameStack();
         const std::vector<GDBFrame> &getFrameStack();
     protected:
