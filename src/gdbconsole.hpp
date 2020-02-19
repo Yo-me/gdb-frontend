@@ -2,7 +2,8 @@
 #define __GDBCONSOLE_HPP__
 
 #include <sstream>
-
+#include <deque>
+#include "imgui.h"  
 #include "gdb.hpp"
 
 class GDBConsole
@@ -11,6 +12,11 @@ class GDBConsole
         GDB *m_gdb;
         std::ostringstream &m_stream;
         int m_scrollToBottom;
+        std::deque<std::string> m_lastCommands;
+        int m_currentCommandIndex;
+
+        void TextEditCallback(ImGuiInputTextCallbackData *data);
+        static void TextEditCallbackStub(ImGuiInputTextCallbackData *data);
     public:
         GDBConsole(GDB *gdb);
         void draw(void);

@@ -475,6 +475,7 @@ void TextEditor::HandleKeyboardInputs()
 	auto ctrl = io.ConfigMacOSXBehaviors ? io.KeySuper : io.KeyCtrl;
 	auto alt = io.ConfigMacOSXBehaviors ? io.KeyCtrl : io.KeyAlt;
 
+#if 0
 	if (ImGui::IsWindowFocused())
 	{
 		if (ImGui::IsWindowHovered())
@@ -555,6 +556,7 @@ void TextEditor::HandleKeyboardInputs()
 			io.InputQueueCharacters.resize(0);
 		}
 	}
+#endif
 }
 
 void TextEditor::HandleMouseInputs()

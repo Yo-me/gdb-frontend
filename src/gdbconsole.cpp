@@ -8,9 +8,54 @@
 GDBConsole::GDBConsole(GDB *gdb)
     :m_gdb(gdb),
     m_stream(*gdb->getConsoleStream()),
-    m_scrollToBottom(0)
+    m_scrollToBottom(0),
+    m_currentCommandIndex(-1)
 {
 
+}
+
+void GDBConsole::TextEditCallbackStub(ImGuiInputTextCallbackData *data)
+{
+    GDBConsole *console = (GDBConsole*)data->UserData;
+    console->TextEditCallback(data);
+}
+
+void GDBConsole::TextEditCallback(ImGuiInputTextCallbackData *data)
+{
+    switch(data->EventFlag)
+    {
+        case ImGuiInputTextFlags_CallbackHistory:
+            {
+                int prevHistoryPos = m_currentCommandIndex;
+                if(data->EventKey == ImGuiKey_UpArrow)
+                {
+                    if(this->m_currentCommandIndex + 1 < this->m_lastCommands.size())
+                    {
+                        this->m_currentCommandIndex++;
+                    }
+                }
+                else if(data->EventKey == ImGuiKey_DownArrow)
+                {
+                    if(this->m_currentCommandIndex >= 0)
+                    {
+                        this->m_currentCommandIndex--;
+                    }
+                }
+
+                if(prevHistoryPos != m_currentCommandIndex)
+                {
+                    data->DeleteChars(0, data->BufTextLen);
+                    if(m_currentCommandIndex != -1)
+                    {
+                        data->InsertChars(0, m_lastCommands.at(m_currentCommandIndex).c_str());
+                    }
+                    
+                }
+            }
+            break;
+        default:
+            break;
+    }
 }
 
 void GDBConsole::draw()
@@ -32,21 +77,36 @@ void GDBConsole::draw()
         ImGui::PopStyleVar();
         ImGui::Separator();
         ImGui::PushItemWidth(ImGui::GetWindowContentRegionMax().x - ImGui::GetStyle().ItemSpacing.x);
-        if (ImGui::InputText("##ConsoleInput", command, IM_ARRAYSIZE(command), ImGuiInputTextFlags_EnterReturnsTrue))
+        if (ImGui::InputText("##ConsoleInput", command, IM_ARRAYSIZE(command), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory, (ImGuiInputTextCallback)GDBConsole::TextEditCallbackStub, (void*)this))
         {
+            std::string cmd(command);
+            if(cmd.empty())
+            {
+                if(this->m_lastCommands.size() > 0)
+                {
+                    cmd = this->m_lastCommands.front();
+                }
+            }
+            else
+            {
+                this->m_lastCommands.push_front(cmd);
+            }
+            
             //command[strlen(command)-1] = '\0';
-            this->m_stream << "(gdb) " << command << std::endl;
-            this->m_gdb->sendCLI(command);
-            std::cout << command << std::endl;
+            this->m_stream << "(gdb) " << cmd << std::endl;
+            this->m_gdb->sendCLI(cmd.c_str());
             command[0] = 0;
             reclaimFocus = true;
             this->m_scrollToBottom = 2;
+            this->m_currentCommandIndex = -1;
         }
+
         ImGui::PopItemWidth();
         // Demonstrate keeping focus on the input box
         ImGui::SetItemDefaultFocus();
         if (reclaimFocus)
             ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
+
     }
     ImGui::End();
 }
