@@ -5,6 +5,7 @@
 #include "sourcewindow.hpp"
 #include "breakpointwindow.hpp"
 #include "stackwindow.hpp"
+#include "variablesWindow.hpp"
 
 class GDB;
 class GLFWwindow;
@@ -18,6 +19,7 @@ class MainWindow
         SourceWindow m_sourceWindow;
         BreakpointWindow m_breakpointWindow;
         StackWindow m_stackWindow;
+        VariablesWindow m_variablesWindow;
         bool m_isFocused;
 
         static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);

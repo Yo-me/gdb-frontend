@@ -85,7 +85,8 @@ MainWindow::MainWindow(GDB *gdb) :
     m_sourceWindow(gdb),
     m_breakpointWindow(gdb),
     m_consoleWindow(gdb),
-    m_stackWindow(gdb)
+    m_stackWindow(gdb),
+    m_variablesWindow(gdb)
 {
     if (!glfwInit())
         std::cout << "Error initializing glfw" << std::endl;
@@ -174,6 +175,7 @@ void MainWindow::draw(void)
     m_breakpointWindow.draw();
     m_consoleWindow.draw();
     m_stackWindow.draw();
+    m_variablesWindow.draw();
     ImGui::PopStyleVar(3);
 
     ImGui::Render();

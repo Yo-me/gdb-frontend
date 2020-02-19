@@ -184,6 +184,19 @@ typedef struct
     int line;
 } GDBBreakpoint;
 
+typedef struct GDBVariableObject
+{
+    std::string name;
+    std::string expression;
+    std::string type;
+    std::string value;
+    bool has_more;
+    bool has_children;
+    
+    std::vector<struct GDBVariableObject> children;
+} GDBVariableObject;
+
+
 class GDB
 {
     private:
@@ -197,6 +210,7 @@ class GDB
 
         std::vector<GDBBreakpoint *> m_breakpoints;
         std::vector<GDBFrame> m_stackFrame;
+        std::vector<GDBVariableObject> m_variableObjects;
 
     public:
         GDB();
@@ -213,6 +227,8 @@ class GDB
         GDBState getState();
 
         const std::vector<GDBBreakpoint *> &getBreakpoints(void);
+        std::vector<GDBVariableObject> &getVariableObjects(void);
+        void retrieveVariableObjectChildren(GDBVariableObject &var);
         std::vector<GDBBreakpoint *>getBreakpoints(std::string filename);
         void setBreakpointState(std::string bp, bool state);
         void breakFileLine(const std::string &filename, int line);
@@ -258,6 +274,9 @@ class GDB
         void stopped(GDBStopResult *s);
         bool checkResultDone();
         bool checkResult(GDB_MESSAGE_CLASS c);
+
+        void deleteVarObj(const std::string &name);
+        void createVarObj(const std::string &expression, std::vector<GDBVariableObject> &objects);
 
         void freeOutput(GDBOutput *o);
         void freeResult(GDBResult *res);

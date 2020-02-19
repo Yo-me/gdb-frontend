@@ -17,8 +17,6 @@ static GDBResult *findResult(GDBOutput *o, const std::string &name)
     return NULL;
 }
 
-
-
 GDB::GDB():
     m_state(GDB_STATE_INIT),
     m_currentFile(""),
@@ -55,9 +53,33 @@ void GDB::setCurrentFrameLevel(int frameLevel)
 {
     if(frameLevel < this->m_stackFrame.size())
     {
+        GDBResult *variablesResult;
+        std::string frameSelectCmd = "-stack-select-frame " + std::to_string(frameLevel) + "\n";
+        std::string cmd = "-stack-list-variables 0 \n";
         this->m_currentFrameLevel = frameLevel;
         this->m_currentSourceLine = this->m_stackFrame[frameLevel].line;
         this->m_currentFile = this->m_stackFrame[frameLevel].fullname;
+
+        for(GDBVariableObject &object : this->m_variableObjects)
+        {
+            this->deleteVarObj(object.name);
+        }
+
+        this->m_variableObjects.clear();
+
+        this->send(frameSelectCmd);
+        if(this->checkResultDone())
+        {
+            /* send list variables command */
+            variablesResult = this->sendCommandAndWaitForResult(cmd, "variables");
+
+            for(GDBResult *v : variablesResult->vec)
+            {
+                this->createVarObj(v->mp["name"]->cstr, this->m_variableObjects);
+            }    
+        }
+
+        
     }
 }
 
@@ -119,40 +141,38 @@ GDBResult *GDB::sendCommandAndWaitForResult(std::string command, std::string res
 
 void GDB::computeFrameStack()
 {
-    if(this->m_state == GDB_STATE_STOPPED)
-    {
-        GDBResult *stackResult = this->sendCommandAndWaitForResult("-stack-list-frames\n", "stack");
-        GDBResult *argsResult = this->sendCommandAndWaitForResult("-stack-list-arguments 2\n", "stack-args");;
-       
-        { 
-            int index = 0;
-            std::cout << "==== Stack Frame ====" << std::endl;
-            this->m_stackFrame.clear();
-            for(GDBResult *frame : stackResult->vec)
+
+    GDBResult *stackResult = this->sendCommandAndWaitForResult("-stack-list-frames\n", "stack");
+    GDBResult *argsResult = this->sendCommandAndWaitForResult("-stack-list-arguments 2\n", "stack-args");;
+    
+    { 
+        int index = 0;
+        std::cout << "==== Stack Frame ====" << std::endl;
+        this->m_stackFrame.clear();
+        for(GDBResult *frame : stackResult->vec)
+        {
+            GDBFrame frameStruct;
+            std::string argsString = "";
+            frameStruct.func = frame->mp["func"]->cstr;
+            frameStruct.fullname = frame->mp["fullname"]->cstr;
+            frameStruct.line = stoi(frame->mp["line"]->cstr);
+            frameStruct.level = stoi(frame->mp["level"]->cstr);
+            for(GDBResult *arg : argsResult->vec[index]->mp["args"]->vec)
             {
-                GDBFrame frameStruct;
-                std::string argsString = "";
-                frameStruct.func = frame->mp["func"]->cstr;
-                frameStruct.fullname = frame->mp["fullname"]->cstr;
-                frameStruct.line = stoi(frame->mp["line"]->cstr);
-                frameStruct.level = stoi(frame->mp["level"]->cstr);
-                for(GDBResult *arg : argsResult->vec[index]->mp["args"]->vec)
-                {
-                    argsString = arg->mp["type"]->cstr;
+                argsString = arg->mp["type"]->cstr;
+                
+                if(argsString[argsString.size()-1] != '*')
+                    argsString += " ";
                     
-                    if(argsString[argsString.size()-1] != '*')
-                        argsString += " ";
-                        
-                    argsString += arg->mp["name"]->cstr;
-                    frameStruct.args.push_back(argsString);
-                }
-                std::cout << frame->mp["level"]->cstr << " : " << frame->mp["func"]->cstr << std::endl;
-                this->m_stackFrame.push_back(frameStruct);
-                index++;
+                argsString += arg->mp["name"]->cstr;
+                frameStruct.args.push_back(argsString);
             }
-            this->freeResult(stackResult);
-            this->freeResult(argsResult);  
+            std::cout << frame->mp["level"]->cstr << " : " << frame->mp["func"]->cstr << std::endl;
+            this->m_stackFrame.push_back(frameStruct);
+            index++;
         }
+        this->freeResult(stackResult);
+        this->freeResult(argsResult);  
     }
 }
 
@@ -163,17 +183,6 @@ void GDB::stopped(GDBStopResult *s)
         if(s->reason != GDB_STOP_REASON_UNKNOWN)
         {
             this->m_state = GDB_STATE_STOPPED;
-            if(s->frame)
-            {
-                this->m_currentFile = s->frame->fullname;
-                this->m_currentSourceLine = s->frame->line;
-            }
-            else
-            {
-                this->m_currentFile = "";
-                this->m_currentSourceLine = -1;
-            }
-            this->m_currentFrameLevel = 0;
         }
     }
 }
@@ -189,6 +198,7 @@ void GDB::poll(void)
         if(this->m_state == GDB_STATE_STOPPED)
         {
             this->computeFrameStack();
+            this->setCurrentFrameLevel(0);
         }
         this->freeOutput(rsp);
     }
@@ -939,6 +949,45 @@ const std::vector<GDBBreakpoint *> &GDB::getBreakpoints(void)
     return this->m_breakpoints;
 }
 
+std::vector<GDBVariableObject> &GDB::getVariableObjects(void)
+{
+    return this->m_variableObjects;
+}
+
+void GDB::retrieveVariableObjectChildren(GDBVariableObject &var)
+{
+    std::string cmd = "-var-list-children --simple-values " + var.name + "\n";
+
+    this->send(cmd);
+    GDBOutput *childrenOutput = this->getResponseBlk();
+
+    if(childrenOutput->cl == GDB_CLASS_DONE && childrenOutput->t == GDB_TYPE_RESULT_RECORD)
+    {
+        for(GDBResult *child : childrenOutput->rs[1]->vec)
+        {
+            GDBVariableObject childVar;
+
+            childVar.name = child->mp["name"]->cstr;
+            childVar.expression = child->mp["exp"]->cstr;
+            childVar.has_children = child->mp["numchild"]->cstr != "0";
+            if(child->mp.find("type") != child->mp.end())
+            {
+                childVar.type = child->mp["type"]->cstr;
+
+            }
+
+            if(child->mp.find("value") != child->mp.end())
+            {
+                childVar.value = child->mp["value"]->cstr;
+                replaceAll(childVar.value, "\\\\\"", "\"");
+                replaceAll(childVar.value, "\\\\\\\\", "\\");
+            }
+            var.children.push_back(childVar);
+
+        }
+    }
+}
+
 std::vector<GDBBreakpoint *> GDB::getBreakpoints(std::string filename)
 {
     std::vector<GDBBreakpoint *> fileBreakpoints;
@@ -1094,6 +1143,50 @@ std::map<int, bool> *GDB::getExecutableLines(const std::string &filename)
     }
 
     return mp;
+}
+
+void GDB::deleteVarObj(const std::string &name)
+{
+    std::ostringstream cmdstream;
+    cmdstream << "-var-delete " << name << "\n";
+
+    this->send(cmdstream.str());
+    this->checkResultDone();
+}
+
+void GDB::createVarObj(const std::string &expression, std::vector<GDBVariableObject> &objects)
+{
+    std::ostringstream cmdstream;
+    GDBOutput *output;
+    GDBVariableObject object;
+    cmdstream << "-var-create - * \"" << expression << "\"\n";
+
+    this->send(cmdstream.str());
+
+    output = this->getResponseBlk();
+
+    if(output->cl == GDB_CLASS_DONE && output->t == GDB_TYPE_RESULT_RECORD)
+    {
+        for(GDBResult *res : output->rs)
+        {
+            if(res->var == "name")
+                object.name = res->cstr;
+            else if(res->var == "type")
+                object.type = res->cstr;
+            else if(res->var == "value")
+            {
+                object.value = res->cstr;
+                replaceAll(object.value, "\\\\\"", "\"");
+                replaceAll(object.value, "\\\\\\\\", "\\");
+                
+            }
+            else if(res->var == "numchild")
+                object.has_children = (res->cstr != "0");
+        }
+        object.expression = expression;
+        objects.push_back(object);
+    }
+    this->freeOutput(output);
 }
 
 void GDB::resume()
