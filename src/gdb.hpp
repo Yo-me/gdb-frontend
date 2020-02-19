@@ -211,10 +211,10 @@ class GDB
         std::vector<GDBBreakpoint *> m_breakpoints;
         std::vector<GDBFrame> m_stackFrame;
         std::vector<GDBVariableObject> m_variableObjects;
+        bool m_completionSupported;
 
     public:
         GDB();
-
         bool setExeFile(const std::string &filename);
         GDBOutput *getResponse();
         GDBOutput *getResponseBlk();
@@ -244,10 +244,12 @@ class GDB
         void interrupt();
         void computeFrameStack();
         const std::vector<GDBFrame> &getFrameStack();
+        std::vector<std::string> complete(std::string command);
     protected:
         virtual bool send(const std::string &message) = 0;
         virtual bool readline(std::string &message) = 0;
         virtual bool gdbProcessRunning() = 0;
+        void init();
     private:
         GDBOutput *parseOutput(std::string &str);
         void parseResultRecord(GDBOutput *o, std::string &str);

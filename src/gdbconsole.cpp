@@ -25,6 +25,20 @@ void GDBConsole::TextEditCallback(ImGuiInputTextCallbackData *data)
 {
     switch(data->EventFlag)
     {
+        case ImGuiInputTextFlags_CallbackCompletion:
+        {
+            this->m_completionList = this->m_gdb->complete(std::string(data->Buf));
+
+            data->DeleteChars(0, data->BufTextLen);
+            data->InsertChars(0, this->m_completionList[0].c_str());
+            if(this->m_completionList.size() > 2)
+            {
+                /* Show completion popup */
+                this->m_openCompletionList = true;
+            }
+            
+        }
+        break;
         case ImGuiInputTextFlags_CallbackHistory:
             {
                 int prevHistoryPos = m_currentCommandIndex;
@@ -77,8 +91,9 @@ void GDBConsole::draw()
         ImGui::EndChild();
         ImGui::PopStyleVar();
         ImGui::Separator();
-        ImGui::PushItemWidth(ImGui::GetWindowContentRegionMax().x - ImGui::GetStyle().ItemSpacing.x);
-        if (ImGui::InputText("##ConsoleInput", command, IM_ARRAYSIZE(command), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory, (ImGuiInputTextCallback)GDBConsole::TextEditCallbackStub, (void*)this))
+        ImGui::PushItemWidth(-1);
+
+        if (ImGui::InputText("##ConsoleInput", command, IM_ARRAYSIZE(command), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackCompletion, (ImGuiInputTextCallback)GDBConsole::TextEditCallbackStub, (void*)this))
         {
             std::string cmd(command);
             if(cmd.empty())
@@ -108,7 +123,6 @@ void GDBConsole::draw()
         if (reclaimFocus)
             ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
         m_isActive = ImGui::IsItemActive();
-
     }
     ImGui::End();
 }

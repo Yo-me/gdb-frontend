@@ -22,6 +22,13 @@ GDB::GDB():
     m_currentFile(""),
     m_currentSourceLine(-1)
 {
+
+}
+
+void GDB::init()
+{
+    GDBResult * res = this->sendCommandAndWaitForResult("-info-gdb-mi-command complete\n", "command");
+    this->m_completionSupported = (res->mp["exists"]->cstr == "true");
 }
 
 std::ostringstream *GDB::getConsoleStream()
@@ -1295,6 +1302,50 @@ const std::vector<GDBFrame> &GDB::getFrameStack()
 
 void GDB::interrupt()
 {
-    GDBOutput *rsp;
     this->send("-exec-interrupt\n");
+}
+
+std::vector<std::string> GDB::complete(std::string command)
+{
+    std::vector<std::string> completionList;
+    if(this-m_completionSupported)
+    {
+        bool found = false;
+        int index = 0;
+        std::string cmd = "-complete \"" + command + "\"\n";
+        GDBOutput *o;
+        GDBOutput *res;
+        this->send(cmd);
+        o = this->getResponseBlk();
+        res = this->getNextResultRecordWithData(o);
+
+    
+        if(res->rs[0]->var == "completion")
+        {
+            completionList.push_back(res->rs[0]->cstr);
+        }
+        else
+        {
+            completionList.push_back(command);
+        }
+        
+        while(!found)
+        {
+            if(res->rs[index]->var == "matches")
+            {
+                found = true;
+                for(GDBResult *str : res->rs[index]->vec)
+                {
+                    completionList.push_back(str->cstr);
+                }
+            }
+            else
+            {
+                index++;
+            }   
+        }
+
+        this->freeOutput(o);
+    }
+    return completionList;
 }

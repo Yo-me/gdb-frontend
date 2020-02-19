@@ -107,7 +107,7 @@ MainWindow::MainWindow(GDB *gdb) :
     ImGui::CreateContext();
     {
         ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable | ImGuiConfigFlags_DockingEnable;
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable | ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_NavEnableKeyboard;
         //io.ConfigViewportsNoAutoMerge = true;
     }
     ImGui_ImplGlfw_InitForOpenGL(m_window, false);

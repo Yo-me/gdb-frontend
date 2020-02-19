@@ -3,6 +3,8 @@
 
 #include <sstream>
 #include <deque>
+#include <vector>
+#include <string>
 #include "imgui.h"  
 #include "gdb.hpp"
 
@@ -13,6 +15,8 @@ class GDBConsole
         std::ostringstream &m_stream;
         int m_scrollToBottom;
         std::deque<std::string> m_lastCommands;
+        std::vector<std::string> m_completionList;
+        bool m_openCompletionList;
         int m_currentCommandIndex;
         bool m_isActive;
 

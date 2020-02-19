@@ -105,6 +105,8 @@ bool GDBWindows::connect()
     this->sendCLI("set new-console on");
     //this->sendCLI("new-ui mi " + miPipeNameGdb);
 
+    this->init();
+
     return true;
 }
 
