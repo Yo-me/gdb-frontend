@@ -180,7 +180,13 @@ void GDB::stopped(GDBStopResult *s)
 {
     if(s)
     {
-        if(s->reason != GDB_STOP_REASON_UNKNOWN)
+        if(s->reason == GDB_STOP_REASON_EXITED_NORMALLY
+            || s->reason == GDB_STOP_REASON_EXITED
+            || s->reason == GDB_STOP_REASON_EXITED_SIGNALLED)
+        {
+            this->m_state = GDB_STATE_INIT;   
+        }
+        else if(s->reason != GDB_STOP_REASON_UNKNOWN)
         {
             this->m_state = GDB_STATE_STOPPED;
         }
@@ -234,9 +240,9 @@ GDBOutput *GDB::getResponse()
                     switch(o->sst)
                     {
                         case GDB_SUBSUBTYPE_CONSOLE:
-                            replaceAll(o->rs[0]->cstr, "(^|[^\\\\])\\\\n", "$1\n");
-                            replaceAll(o->rs[0]->cstr, "(^|[^\\\\])\\\\t", "$1\t");
-                            replaceAll(o->rs[0]->cstr, "\\\\\"", "\"");
+                            Utils::replaceAll(o->rs[0]->cstr, "(^|[^\\\\])\\\\n", "$1\n");
+                            Utils::replaceAll(o->rs[0]->cstr, "(^|[^\\\\])\\\\t", "$1\t");
+                            Utils::replaceAll(o->rs[0]->cstr, "\\\\\"", "\"");
                             this->m_consoleStream << o->rs[0]->cstr;
                             break;
                     }
@@ -451,10 +457,10 @@ void GDB::parseString(GDBResult *res, std::string &str, size_t &index)
                 res->cstr += str[index];
                 index++;
             }
-            //replaceAll(res->cstr, "\\\\\"", "\"");
-            //replaceAll(res->cstr, "(^|[^\\\\])\\\\n", "$1\n");
-            //replaceAll(res->cstr, "(^|[^\\\\])\\\\t", "$1\t");
-            //replaceAll(res->cstr, "\\\\\\\\", "\\");
+            //Utils::replaceAll(res->cstr, "\\\\\"", "\"");
+            //Utils::replaceAll(res->cstr, "(^|[^\\\\])\\\\n", "$1\n");
+            //Utils::replaceAll(res->cstr, "(^|[^\\\\])\\\\t", "$1\t");
+            //Utils::replaceAll(res->cstr, "\\\\\\\\", "\\");
             index++;
         }
     }
@@ -490,6 +496,7 @@ GDB_STOP_REASON reasonValues[]=
     GDB_STOP_REASON_END_STEPPING,
     GDB_STOP_REASON_EXITED_SIGNALLED,
     GDB_STOP_REASON_EXITED,
+    GDB_STOP_REASON_EXITED_NORMALLY,
     GDB_STOP_REASON_SIGNAL_RECEIVED
 };
 
@@ -848,7 +855,7 @@ void GDB::getNearestExecutableLine(const std::string &filename, std::string & li
     bool found = false;
     int index = 0;
     cmd << "-symbol-list-lines ";
-    cmd << basename(filename);
+    cmd << Utils::basename(filename);
     cmd << "\n";
     execLinesResult = this->sendCommandAndWaitForResult(cmd.str(), "lines");
 
@@ -956,34 +963,37 @@ std::vector<GDBVariableObject> &GDB::getVariableObjects(void)
 
 void GDB::retrieveVariableObjectChildren(GDBVariableObject &var)
 {
-    std::string cmd = "-var-list-children --simple-values " + var.name + "\n";
-
-    this->send(cmd);
-    GDBOutput *childrenOutput = this->getResponseBlk();
-
-    if(childrenOutput->cl == GDB_CLASS_DONE && childrenOutput->t == GDB_TYPE_RESULT_RECORD)
+    if(this->m_state == GDB_STATE_STOPPED)
     {
-        for(GDBResult *child : childrenOutput->rs[1]->vec)
+        std::string cmd = "-var-list-children --simple-values " + var.name + "\n";
+
+        this->send(cmd);
+        GDBOutput *childrenOutput = this->getResponseBlk();
+
+        if(childrenOutput->cl == GDB_CLASS_DONE && childrenOutput->t == GDB_TYPE_RESULT_RECORD)
         {
-            GDBVariableObject childVar;
-
-            childVar.name = child->mp["name"]->cstr;
-            childVar.expression = child->mp["exp"]->cstr;
-            childVar.has_children = child->mp["numchild"]->cstr != "0";
-            if(child->mp.find("type") != child->mp.end())
+            for(GDBResult *child : childrenOutput->rs[1]->vec)
             {
-                childVar.type = child->mp["type"]->cstr;
+                GDBVariableObject childVar;
+
+                childVar.name = child->mp["name"]->cstr;
+                childVar.expression = child->mp["exp"]->cstr;
+                childVar.has_children = child->mp["numchild"]->cstr != "0";
+                if(child->mp.find("type") != child->mp.end())
+                {
+                    childVar.type = child->mp["type"]->cstr;
+
+                }
+
+                if(child->mp.find("value") != child->mp.end())
+                {
+                    childVar.value = child->mp["value"]->cstr;
+                    Utils::replaceAll(childVar.value, "\\\\\"", "\"");
+                    Utils::replaceAll(childVar.value, "\\\\\\\\", "\\");
+                }
+                var.children.push_back(childVar);
 
             }
-
-            if(child->mp.find("value") != child->mp.end())
-            {
-                childVar.value = child->mp["value"]->cstr;
-                replaceAll(childVar.value, "\\\\\"", "\"");
-                replaceAll(childVar.value, "\\\\\\\\", "\\");
-            }
-            var.children.push_back(childVar);
-
         }
     }
 }
@@ -1079,7 +1089,7 @@ void GDB::breakFileLine(const std::string &filename, int line)
         GDBOutput *o;
         std::ostringstream cmd;
 
-        cmd << "-break-insert " << basename(filename) << ":" << line << "\n";
+        cmd << "-break-insert " << Utils::basename(filename) << ":" << line << "\n";
         this->send(cmd.str());
         o = this->getResponseBlk();
 
@@ -1122,7 +1132,7 @@ std::map<int, bool> *GDB::getExecutableLines(const std::string &filename)
             std::ostringstream cmd;
             GDBOutput *o;
             cmd << "-symbol-list-lines ";
-            cmd << basename(filename);
+            cmd << Utils::basename(filename);
             cmd << "\n";
             this->send(cmd.str());
 
@@ -1176,8 +1186,8 @@ void GDB::createVarObj(const std::string &expression, std::vector<GDBVariableObj
             else if(res->var == "value")
             {
                 object.value = res->cstr;
-                replaceAll(object.value, "\\\\\"", "\"");
-                replaceAll(object.value, "\\\\\\\\", "\\");
+                Utils::replaceAll(object.value, "\\\\\"", "\"");
+                Utils::replaceAll(object.value, "\\\\\\\\", "\\");
                 
             }
             else if(res->var == "numchild")
@@ -1193,12 +1203,17 @@ void GDB::resume()
 {
     if(m_state == GDB_STATE_STOPPED)
     {
+        GDBOutput *rsp;
 
         this->send("-exec-continue\n");
 
-        //rsp = this->getResponse();
-//
-        //delete rsp;
+        rsp = this->getResponseBlk();
+        if(rsp->t == GDB_TYPE_RESULT_RECORD && rsp->cl == GDB_CLASS_ERROR)
+        {
+            this->m_state = GDB_STATE_INIT;
+        }
+
+        this->freeOutput(rsp);
     }
 }
 
@@ -1210,9 +1225,13 @@ void GDB::next()
 
         this->send("-exec-next\n");
 
-        rsp = this->getResponse();
+        rsp = this->getResponseBlk();
+        if(rsp->t == GDB_TYPE_RESULT_RECORD && rsp->cl == GDB_CLASS_ERROR)
+        {
+            this->m_state = GDB_STATE_INIT;
+        }
 
-        delete rsp;
+        this->freeOutput(rsp);
     }
 
 }
@@ -1225,9 +1244,13 @@ void GDB::step()
 
         this->send("-exec-step\n");
 
-        rsp = this->getResponse();
+           rsp = this->getResponseBlk();
+        if(rsp->t == GDB_TYPE_RESULT_RECORD && rsp->cl == GDB_CLASS_ERROR)
+        {
+            this->m_state = GDB_STATE_INIT;
+        }
 
-        delete rsp;
+        this->freeOutput(rsp);
     }
 }
 
@@ -1239,9 +1262,13 @@ void GDB::finish()
 
         this->send("-exec-finish\n");
 
-        rsp = this->getResponse();
+           rsp = this->getResponseBlk();
+        if(rsp->t == GDB_TYPE_RESULT_RECORD && rsp->cl == GDB_CLASS_ERROR)
+        {
+            this->m_state = GDB_STATE_INIT;
+        }
 
-        delete rsp;
+        this->freeOutput(rsp);
     }
 }
 
@@ -1253,9 +1280,13 @@ void GDB::run()
 
         this->send("-exec-run\n");
 
-        rsp = this->getResponse();
+        rsp = this->getResponseBlk();
+        if(rsp->t == GDB_TYPE_RESULT_RECORD && rsp->cl == GDB_CLASS_ERROR)
+        {
+            this->m_state = GDB_STATE_INIT;
+        }
 
-        delete rsp;
+        this->freeOutput(rsp);
     }
 }
 

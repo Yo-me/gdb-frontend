@@ -3,7 +3,7 @@
 #include <string>
 #include <regex>
 
-std::string basename(std::string filename)
+std::string Utils::basename(std::string filename)
 {
     size_t basename_start = filename.find_last_of("/\\", std::string::npos);
     if(basename_start != std::string::npos)
@@ -12,7 +12,7 @@ std::string basename(std::string filename)
         return filename;
 }
 
-void replaceAll(std::string& str, const std::string& from, const std::string& to) {
+void Utils::replaceAll(std::string& str, const std::string& from, const std::string& to) {
 
     std::regex e(from);
     while(std::regex_search(str, e))

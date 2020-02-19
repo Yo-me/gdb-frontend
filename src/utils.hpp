@@ -3,7 +3,9 @@
 
 #include <string>
 
-extern std::string basename(std::string filename);
-extern void replaceAll(std::string& str, const std::string& from, const std::string& to);
-
+namespace Utils
+{
+    std::string basename(std::string filename);
+    void replaceAll(std::string& str, const std::string& from, const std::string& to);
+}
 #endif

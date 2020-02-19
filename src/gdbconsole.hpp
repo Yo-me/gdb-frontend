@@ -14,12 +14,14 @@ class GDBConsole
         int m_scrollToBottom;
         std::deque<std::string> m_lastCommands;
         int m_currentCommandIndex;
+        bool m_isActive;
 
         void TextEditCallback(ImGuiInputTextCallbackData *data);
         static void TextEditCallbackStub(ImGuiInputTextCallbackData *data);
     public:
         GDBConsole(GDB *gdb);
         void draw(void);
+        bool isActive();
 };
 
 #endif

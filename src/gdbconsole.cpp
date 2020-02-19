@@ -9,7 +9,8 @@ GDBConsole::GDBConsole(GDB *gdb)
     :m_gdb(gdb),
     m_stream(*gdb->getConsoleStream()),
     m_scrollToBottom(0),
-    m_currentCommandIndex(-1)
+    m_currentCommandIndex(-1),
+    m_isActive(false)
 {
 
 }
@@ -106,7 +107,13 @@ void GDBConsole::draw()
         ImGui::SetItemDefaultFocus();
         if (reclaimFocus)
             ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
+        m_isActive = ImGui::IsItemActive();
 
     }
     ImGui::End();
+}
+
+bool GDBConsole::isActive()
+{
+    return this->m_isActive;
 }

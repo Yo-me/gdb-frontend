@@ -22,7 +22,7 @@ void MainWindow::characterCallback(GLFWwindow* window, unsigned int codepoint)
 {
     MainWindow *mainWindow = static_cast<MainWindow *>(glfwGetWindowUserPointer(window));
     ImGuiIO &io = ImGui::GetIO();
-    if(!io.WantCaptureKeyboard || mainWindow->m_sourceWindow.isFocused() && mainWindow->m_gdb->getState() == GDB_STATE_STOPPED)
+    if(!io.WantCaptureKeyboard && mainWindow->m_gdb->getState() == GDB_STATE_STOPPED)
     {
         switch(codepoint)
         {
