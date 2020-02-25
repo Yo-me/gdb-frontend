@@ -153,7 +153,7 @@ typedef struct GDBStopResult
     bool hasExitCode;
     bool hasWpNo;
 
-    int threadId;
+    std::string threadId;
     GDBFrame *frame;
 
     int bkptNo;
@@ -207,9 +207,10 @@ class GDB
         std::string m_currentFile;
         int m_currentSourceLine;
         int m_currentFrameLevel;
+        std::string m_currentThread;
 
         std::vector<GDBBreakpoint *> m_breakpoints;
-        std::vector<GDBFrame> m_stackFrame;
+        std::map< std::string, std::vector<GDBFrame> > m_stackFrame;
         std::vector<GDBVariableObject> m_variableObjects;
         bool m_completionSupported;
 
@@ -224,6 +225,8 @@ class GDB
         int getCurrentSourceLine();
         int getCurrentFrameLevel();
         void setCurrentFrameLevel(int frameLevel);
+        void setCurrentThread(const std::string &threadId);
+        std::string getCurrentThread();
         GDBState getState();
 
         const std::vector<GDBBreakpoint *> &getBreakpoints(void);
@@ -243,7 +246,7 @@ class GDB
         void run();
         void interrupt();
         void computeFrameStack();
-        const std::vector<GDBFrame> &getFrameStack();
+        const std::map<std::string, std::vector<GDBFrame>>  &getFrameStack();
         std::vector<std::string> complete(std::string command);
     protected:
         virtual bool send(const std::string &message) = 0;

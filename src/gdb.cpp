@@ -56,16 +56,26 @@ int GDB::getCurrentFrameLevel()
     return this->m_currentFrameLevel;   
 }
 
+void GDB::setCurrentThread(const std::string &threadId)
+{
+    this->m_currentThread = threadId;
+}
+
+std::string GDB::getCurrentThread()
+{
+    return this->m_currentThread;
+}
+
 void GDB::setCurrentFrameLevel(int frameLevel)
 {
     if(frameLevel < this->m_stackFrame.size())
     {
         GDBResult *variablesResult;
-        std::string frameSelectCmd = "-stack-select-frame " + std::to_string(frameLevel) + "\n";
-        std::string cmd = "-stack-list-variables 0 \n";
+        //std::string frameSelectCmd = "-stack-select-frame " + std::to_string(frameLevel) + "\n";
+        std::string cmd = "-stack-list-variables --thread " + this->m_currentThread + " --frame " + std::to_string(frameLevel) + " --simple-values\n";
         this->m_currentFrameLevel = frameLevel;
-        this->m_currentSourceLine = this->m_stackFrame[frameLevel].line;
-        this->m_currentFile = this->m_stackFrame[frameLevel].fullname;
+        this->m_currentSourceLine = this->m_stackFrame[this->m_currentThread][frameLevel].line;
+        this->m_currentFile = this->m_stackFrame[this->m_currentThread][frameLevel].fullname;
 
         for(GDBVariableObject &object : this->m_variableObjects)
         {
@@ -74,8 +84,6 @@ void GDB::setCurrentFrameLevel(int frameLevel)
 
         this->m_variableObjects.clear();
 
-        this->send(frameSelectCmd);
-        if(this->checkResultDone())
         {
             /* send list variables command */
             variablesResult = this->sendCommandAndWaitForResult(cmd, "variables");
@@ -148,39 +156,56 @@ GDBResult *GDB::sendCommandAndWaitForResult(std::string command, std::string res
 
 void GDB::computeFrameStack()
 {
+    GDBResult *threadsResult = this->sendCommandAndWaitForResult("-thread-info\n", "threads");
 
-    GDBResult *stackResult = this->sendCommandAndWaitForResult("-stack-list-frames\n", "stack");
-    GDBResult *argsResult = this->sendCommandAndWaitForResult("-stack-list-arguments 2\n", "stack-args");;
+    this->m_stackFrame.clear();
+    for(GDBResult *thread : threadsResult->vec)
+    {
+        std::string threadId = thread->mp["id"]->cstr;
+        GDBResult *stackResult = this->sendCommandAndWaitForResult("-stack-list-frames --thread " + threadId + "\n", "stack");
+        GDBResult *argsResult = this->sendCommandAndWaitForResult("-stack-list-arguments --thread " + threadId + " 2\n", "stack-args");;
     
-    { 
-        int index = 0;
-        std::cout << "==== Stack Frame ====" << std::endl;
-        this->m_stackFrame.clear();
-        for(GDBResult *frame : stackResult->vec)
-        {
-            GDBFrame frameStruct;
-            std::string argsString = "";
-            frameStruct.func = frame->mp["func"]->cstr;
-            frameStruct.fullname = frame->mp["fullname"]->cstr;
-            frameStruct.line = stoi(frame->mp["line"]->cstr);
-            frameStruct.level = stoi(frame->mp["level"]->cstr);
-            for(GDBResult *arg : argsResult->vec[index]->mp["args"]->vec)
+        { 
+            int index = 0;
+            std::cout << "==== Stack Frame ====" << std::endl;
+            for(GDBResult *frame : stackResult->vec)
             {
-                argsString = arg->mp["type"]->cstr;
+                GDBFrame frameStruct;
+                std::string argsString = "";
+                frameStruct.func = frame->mp["func"]->cstr;
+                if(frame->mp.find("fullname") != frame->mp.end())
+                {
+                    frameStruct.fullname = frame->mp["fullname"]->cstr;
+                }
+                if(frame->mp.find("line") != frame->mp.end())
+                {
+                    frameStruct.line = stoi(frame->mp["line"]->cstr);
+                }
+                else
+                {
+                    frameStruct.line = 0;
+                }
                 
-                if(argsString[argsString.size()-1] != '*')
-                    argsString += " ";
+                frameStruct.level = stoi(frame->mp["level"]->cstr);
+                for(GDBResult *arg : argsResult->vec[index]->mp["args"]->vec)
+                {
+                    argsString = arg->mp["type"]->cstr;
                     
-                argsString += arg->mp["name"]->cstr;
-                frameStruct.args.push_back(argsString);
+                    if(argsString[argsString.size()-1] != '*')
+                        argsString += " ";
+                        
+                    argsString += arg->mp["name"]->cstr;
+                    frameStruct.args.push_back(argsString);
+                }
+                std::cout << frame->mp["level"]->cstr << " : " << frame->mp["func"]->cstr << std::endl;
+                this->m_stackFrame[threadId].push_back(frameStruct);
+                index++;
             }
-            std::cout << frame->mp["level"]->cstr << " : " << frame->mp["func"]->cstr << std::endl;
-            this->m_stackFrame.push_back(frameStruct);
-            index++;
+            this->freeResult(stackResult);
+            this->freeResult(argsResult);  
         }
-        this->freeResult(stackResult);
-        this->freeResult(argsResult);  
     }
+    this->freeResult(threadsResult);
 }
 
 void GDB::stopped(GDBStopResult *s)
@@ -191,11 +216,12 @@ void GDB::stopped(GDBStopResult *s)
             || s->reason == GDB_STOP_REASON_EXITED
             || s->reason == GDB_STOP_REASON_EXITED_SIGNALLED)
         {
-            this->m_state = GDB_STATE_INIT;   
+            this->m_state = GDB_STATE_INIT; 
         }
         else if(s->reason != GDB_STOP_REASON_UNKNOWN)
         {
             this->m_state = GDB_STATE_STOPPED;
+            this->m_currentThread = s->threadId;  
         }
     }
 }
@@ -574,6 +600,14 @@ GDBStopResult *GDB::getStopResult(GDBOutput *o)
                 {
                     res->frame = NULL;
                 }
+
+                /* Read thread id */
+                tmp = findResult(o, "thread-id");
+                if(tmp)
+                {
+                    res->threadId = tmp->cstr;
+                }
+                
             }
             return res;
         }
@@ -1295,7 +1329,7 @@ void GDB::run()
     }
 }
 
-const std::vector<GDBFrame> &GDB::getFrameStack()
+const std::map<std::string, std::vector<GDBFrame>> &GDB::getFrameStack()
 {
     return this->m_stackFrame;
 }
