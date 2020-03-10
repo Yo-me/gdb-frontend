@@ -9,6 +9,36 @@
 #include "gdbwindows.hpp"
 #include "mainwindow.hpp"
 
+void BindStdHandlesToConsole()
+{
+    //TODO: Add Error checking.
+    
+    // Redirect the CRT standard input, output, and error handles to the console
+    freopen("CONIN$", "r", stdin);
+    freopen("CONOUT$", "w", stderr);
+    freopen("CONOUT$", "w", stdout);
+    
+    // Note that there is no CONERR$ file
+    HANDLE hStdout = CreateFile("CONOUT$",  GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hStdin = CreateFile("CONIN$",  GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    
+    SetStdHandle(STD_OUTPUT_HANDLE,hStdout);
+    SetStdHandle(STD_ERROR_HANDLE,hStdout);
+    SetStdHandle(STD_INPUT_HANDLE,hStdin);
+
+    //Clear the error state for each of the C++ standard stream objects. 
+    std::wclog.clear();
+    std::clog.clear();
+    std::wcout.clear();
+    std::cout.clear();
+    std::wcerr.clear();
+    std::cerr.clear();
+    std::wcin.clear();
+    std::cin.clear();
+}
+
 
 int main(int argc, char **argv)
 {
@@ -30,6 +60,8 @@ int main(int argc, char **argv)
                 break;
             case 'v':
                 verbose = true;
+                AllocConsole();
+                BindStdHandlesToConsole();
                 break;
             default:
                 std::cerr << "Usage : " << std::endl << argv[0] << " [-g <gdb executable>]" << std::endl;

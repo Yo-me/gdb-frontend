@@ -73,7 +73,7 @@ bool GDBWindows::connect()
     siStartInfo.hStdError = tmpGDBWrite;
     siStartInfo.hStdOutput = tmpGDBWrite;
     siStartInfo.hStdInput = tmpGDBRead;
-    siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+    siStartInfo.dwFlags |= STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 
     commandLine << this->m_path << " " << this->m_args << "--interpreter=mi --quiet";
 
