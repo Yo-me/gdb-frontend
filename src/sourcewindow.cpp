@@ -48,12 +48,12 @@ void SourceWindow::draw()
 
         m_sourceView.SetBreakpoints(m_breakpoints);
 
+        m_sourceView.Render("SourceView");
         if(this->m_gdb->getCurrentSourceLine() != -1 && this->m_currentSourceLine != this->m_gdb->getCurrentSourceLine()-1)
         {
             this->m_currentSourceLine = this->m_gdb->getCurrentSourceLine() - 1;
             m_sourceView.SetCursorPosition( TextEditor::Coordinates(m_currentSourceLine, 0));
         }
-        m_sourceView.Render("SourceView");
     }
     ImGui::End();
 }

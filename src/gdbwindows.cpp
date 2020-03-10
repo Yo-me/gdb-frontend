@@ -75,8 +75,8 @@ bool GDBWindows::connect()
     siStartInfo.hStdInput = tmpGDBRead;
     siStartInfo.dwFlags |= STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 
-    commandLine << this->m_path << " " << this->m_args << "--interpreter=mi --quiet";
-
+    commandLine << this->m_path << " --interpreter=mi --quiet " << this->m_args;
+    m_logger.logInfo("Lauching gdb with command line : " + commandLine.str());
     // Create the child process.
 
     bSuccess = CreateProcess(NULL,
@@ -103,6 +103,7 @@ bool GDBWindows::connect()
         Sleep(1000);
     }
     this->sendCLI("set new-console on");
+    this->getResponseBlk();
     //this->sendCLI("new-ui mi " + miPipeNameGdb);
 
     this->init();

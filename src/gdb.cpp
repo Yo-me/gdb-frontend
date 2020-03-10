@@ -27,8 +27,19 @@ GDB::GDB():
 
 void GDB::init()
 {
-    GDBResult * res = this->sendCommandAndWaitForResult("-info-gdb-mi-command complete\n", "command");
-    this->m_completionSupported = (res->mp["exists"]->cstr == "true");
+    this->send("-info-gdb-mi-command complete\n");
+    GDBOutput *o = this->getResponseBlk();
+    
+    GDBOutput *result = this->getNextResultRecordWithData(o);
+    if(result->cl == GDB_CLASS_DONE)
+    {
+        GDBResult * res = result->rs[0];
+        this->m_completionSupported = (res->mp["exists"]->cstr == "true");
+    }
+    else if(result->cl == GDB_CLASS_DONE)
+    {
+        this->m_completionSupported = false;
+    }
 }
 
 std::ostringstream *GDB::getConsoleStream()
