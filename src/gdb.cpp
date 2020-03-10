@@ -1353,7 +1353,7 @@ void GDB::interrupt()
 std::vector<std::string> GDB::complete(std::string command)
 {
     std::vector<std::string> completionList;
-    if(this-m_completionSupported)
+    if(this->m_completionSupported)
     {
         bool found = false;
         int index = 0;
@@ -1391,6 +1391,10 @@ std::vector<std::string> GDB::complete(std::string command)
         }
 
         this->freeOutput(o);
+    }
+    else
+    {
+        completionList.push_back(command);
     }
     return completionList;
 }
