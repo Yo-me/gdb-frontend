@@ -7,6 +7,8 @@
 #include <vector>
 #include <map>
 
+#include "Logger.hpp"
+
 typedef enum
 {
     GDB_TYPE_OUT_OF_BAND = 0,
@@ -213,79 +215,85 @@ class GDB
         std::map< std::string, std::vector<GDBFrame> > m_stackFrame;
         std::vector<GDBVariableObject> m_variableObjects;
         bool m_completionSupported;
-
-    public:
-        GDB();
-        bool setExeFile(const std::string &filename);
-        GDBOutput *getResponse();
-        GDBOutput *getResponseBlk();
-        bool sendCLI(const std::string &command);
-        void poll(void);
-        std::string getCurrentFilePath();
-        int getCurrentSourceLine();
-        int getCurrentFrameLevel();
-        void setCurrentFrameLevel(int frameLevel);
-        void setCurrentThread(const std::string &threadId);
-        std::string getCurrentThread();
-        GDBState getState();
-
-        const std::vector<GDBBreakpoint *> &getBreakpoints(void);
-        std::vector<GDBVariableObject> &getVariableObjects(void);
-        void retrieveVariableObjectChildren(GDBVariableObject &var);
-        std::vector<GDBBreakpoint *>getBreakpoints(std::string filename);
-        void setBreakpointState(std::string bp, bool state);
-        void breakFileLine(const std::string &filename, int line);
-        void breakDelete(const std::string &number);
-
-        std::map<int, bool> *getExecutableLines(const std::string &filename);
-        std::ostringstream *getConsoleStream();
-        void resume();
-        void next();
-        void step();
-        void finish();
-        void run();
-        void interrupt();
-        void computeFrameStack();
-        const std::map<std::string, std::vector<GDBFrame>>  &getFrameStack();
-        std::vector<std::string> complete(std::string command);
     protected:
-        virtual bool send(const std::string &message) = 0;
-        virtual bool readline(std::string &message) = 0;
-        virtual bool gdbProcessRunning() = 0;
-        void init();
-    private:
-        GDBOutput *parseOutput(std::string &str);
-        void parseResultRecord(GDBOutput *o, std::string &str);
-        void parseExecAsyncRecord(GDBOutput *o, std::string &str);
-        void parseNotifyAsyncRecord(GDBOutput *o, std::string &str);
-        void parseAsyncRecord(GDBOutput *o, std::string &str);
-        void parseConsoleStreamOutput(GDBOutput *o, std::string &str);
-        void parseConsoleOutput(GDBOutput *o, std::string &str);
-        void parseResults(GDBOutput *o, std::string &str);
-        GDBResult *parseResult(std::string &str, GDBResult *pres, size_t &index);
-        void parseString(GDBResult *o, std::string &str, size_t &index);
-        void parseTuple(GDBResult *o, std::string &str, size_t &index);
-        void parseList(GDBResult *o, std::string &str, size_t &index);
-        GDBResult *sendCommandAndWaitForResult(std::string command, std::string resultName);
+            Logger m_logger;
 
-        GDBBreakpoint *findBreakpoint(std::string bp);
-        GDBBreakpoint *findBreakpoint(std::string file, int line);
-        void addOrUpdateBreakpoint(GDBOutput *o);
-        void getNearestExecutableLine(const std::string &filename, std::string & line);
-        void deleteBreakpoint(const std::string &bp);
+        public:
+            GDB();
+            bool setExeFile(const std::string &filename);
+            GDBOutput *getResponse();
+            GDBOutput *getResponseBlk();
+            bool sendCLI(const std::string &command);
+            void poll(void);
+            std::string getCurrentFilePath();
+            int getCurrentSourceLine();
+            int getCurrentFrameLevel();
+            void setCurrentFrameLevel(int frameLevel);
+            void setCurrentThread(const std::string &threadId);
+            std::string getCurrentThread();
+            GDBState getState();
 
-        GDBOutput *getResultRecord(GDBOutput *o);
-        GDBOutput *getNextResultRecordWithData(GDBOutput *o);
-        GDBStopResult *getStopResult(GDBOutput *o);
-        void stopped(GDBStopResult *s);
-        bool checkResultDone();
-        bool checkResult(GDB_MESSAGE_CLASS c);
+            const std::vector<GDBBreakpoint *> &getBreakpoints(void);
+            std::vector<GDBVariableObject> &getVariableObjects(void);
+            void retrieveVariableObjectChildren(GDBVariableObject &var);
+            std::vector<GDBBreakpoint *> getBreakpoints(std::string filename);
+            void setBreakpointState(std::string bp, bool state);
+            void breakFileLine(const std::string &filename, int line);
+            void breakDelete(const std::string &number);
 
-        void deleteVarObj(const std::string &name);
-        void createVarObj(const std::string &expression, std::vector<GDBVariableObject> &objects);
+            std::map<int, bool> *getExecutableLines(const std::string &filename);
+            std::ostringstream *getConsoleStream();
+            void resume();
+            void next();
+            void step();
+            void finish();
+            void run();
+            void interrupt();
+            void computeFrameStack();
+            const std::map<std::string, std::vector<GDBFrame>> &getFrameStack();
+            std::vector<std::string> complete(std::string command);
 
-        void freeOutput(GDBOutput *o);
-        void freeResult(GDBResult *res);
+            void setVerbose();
+
+        protected:
+            virtual bool send(const std::string &message) = 0;
+            virtual bool readline(std::string &message) = 0;
+            virtual bool gdbProcessRunning() = 0;
+            void init();
+
+        private:
+            GDBOutput *parseOutput(std::string &str);
+            void parseResultRecord(GDBOutput *o, std::string &str);
+            void parseExecAsyncRecord(GDBOutput *o, std::string &str);
+            void parseNotifyAsyncRecord(GDBOutput *o, std::string &str);
+            void parseAsyncRecord(GDBOutput *o, std::string &str);
+            void parseConsoleStreamOutput(GDBOutput *o, std::string &str);
+            void parseConsoleOutput(GDBOutput *o, std::string &str);
+            void parseResults(GDBOutput *o, std::string &str);
+            GDBResult *parseResult(std::string &str, GDBResult *pres, size_t &index);
+            void parseString(GDBResult *o, std::string &str, size_t &index);
+            void parseTuple(GDBResult *o, std::string &str, size_t &index);
+            void parseList(GDBResult *o, std::string &str, size_t &index);
+            GDBResult *sendCommandAndWaitForResult(std::string command, std::string resultName);
+
+            GDBBreakpoint *findBreakpoint(std::string bp);
+            GDBBreakpoint *findBreakpoint(std::string file, int line);
+            void addOrUpdateBreakpoint(GDBOutput *o);
+            void getNearestExecutableLine(const std::string &filename, std::string &line);
+            void deleteBreakpoint(const std::string &bp);
+
+            GDBOutput *getResultRecord(GDBOutput *o);
+            GDBOutput *getNextResultRecordWithData(GDBOutput *o);
+            GDBStopResult *getStopResult(GDBOutput *o);
+            void stopped(GDBStopResult *s);
+            bool checkResultDone();
+            bool checkResult(GDB_MESSAGE_CLASS c);
+
+            void deleteVarObj(const std::string &name);
+            void createVarObj(const std::string &expression, std::vector<GDBVariableObject> &objects);
+
+            void freeOutput(GDBOutput *o);
+            void freeResult(GDBResult *res);
 };
 
 #endif

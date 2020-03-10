@@ -124,7 +124,6 @@ bool GDBWindows::readline(std::string &message)
         {
             if(c == '\n')
             {
-                std::cout << "Received from gdb : " << message << std::endl;
                 return true;
             }
             else if(c != '\r')
@@ -133,9 +132,6 @@ bool GDBWindows::readline(std::string &message)
             }
         }
     } while(success);
-
-    if(message.length() > 0)
-        std::cout << "Received from gdb : " << message << std::endl;
 
     return success;
 }
@@ -146,11 +142,10 @@ bool GDBWindows::send(const std::string &message)
     DWORD length;
     BOOL success;
 
-    std::cout << "Sending data to gdb : " << message;
+    m_logger.logInfo("[TO GDB] " + message);
 
     success = WriteFile(this->m_toGDB, message.c_str(), message.length(), &length, NULL);
 
-    std::cout << ((success && length > 0) ? "Success " : "Failed ") << GetLastError() << std::endl;
     return (success && length > 0);
 }
 

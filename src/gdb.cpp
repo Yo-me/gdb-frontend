@@ -107,11 +107,11 @@ bool GDB::setExeFile(const std::string &filename)
     cmd << "-file-exec-and-symbols \"" << filename << "\"\n";
     this->send(cmd.str());
 
-    std::cout << response << std::endl;
-
     rsp = this->getResponse();
 
     delete rsp;
+
+    return true;
 }
 
 bool GDB::sendCLI(const std::string &command)
@@ -167,7 +167,7 @@ void GDB::computeFrameStack()
     
         { 
             int index = 0;
-            std::cout << "==== Stack Frame ====" << std::endl;
+            m_logger.logInfo("==== Stack Frame ====");
             for(GDBResult *frame : stackResult->vec)
             {
                 GDBFrame frameStruct;
@@ -197,7 +197,7 @@ void GDB::computeFrameStack()
                     argsString += arg->mp["name"]->cstr;
                     frameStruct.args.push_back(argsString);
                 }
-                std::cout << frame->mp["level"]->cstr << " : " << frame->mp["func"]->cstr << std::endl;
+                m_logger.logInfo(frame->mp["level"]->cstr + " : " + frame->mp["func"]->cstr);
                 this->m_stackFrame[threadId].push_back(frameStruct);
                 index++;
             }
@@ -262,7 +262,7 @@ GDBOutput *GDB::getResponse()
 
         if(output.length() > 0 && output.compare(0, 5, "(gdb)"))
         {
-            std::cout << output << std::endl;
+            m_logger.logInfo(output);
             o = this->parseOutput(output);
             if(o)
             {
@@ -691,7 +691,6 @@ void GDB::freeResult(GDBResult *res)
         case GDB_VALUE_TYPE_TUPLE:
             for(std::map<std::string, GDBResult*>::iterator it = res->mp.begin(); it != res->mp.end(); it++)
             {
-                //std::cout << "Freeing " << it->first << std::endl;
                 if(it->second)
                     this->freeResult(it->second);
             }
@@ -1113,34 +1112,35 @@ void GDB::setBreakpointState(std::string bp, bool state)
 
 void GDB::breakFileLine(const std::string &filename, int line)
 {
-    GDBBreakpoint *bp;
-    std::string sline = std::to_string(line);
-    this->getNearestExecutableLine(filename, sline);
-
-    line = stoi(sline);
-
-    if(bp = this->findBreakpoint(filename, line))
+    if(this->m_state == GDB_STATE_STOPPED)
     {
-        this->breakDelete(bp->number);
-    }
-    else
-    {    
-        GDBOutput *o;
-        std::ostringstream cmd;
 
-        cmd << "-break-insert " << Utils::basename(filename) << ":" << line << "\n";
-        this->send(cmd.str());
-        o = this->getResponseBlk();
+        GDBBreakpoint *bp;
+        std::string sline = std::to_string(line);
+        this->getNearestExecutableLine(filename, sline);
 
-        if(o && o->t == GDB_TYPE_RESULT_RECORD && o->cl == GDB_CLASS_DONE)
+        line = stoi(sline);
+
+        if(bp = this->findBreakpoint(filename, line))
         {
-            this->addOrUpdateBreakpoint(o);
-            this->freeOutput(o);
+            this->breakDelete(bp->number);
+        }
+        else
+        {    
+            GDBOutput *o;
+            std::ostringstream cmd;
+
+            cmd << "-break-insert " << Utils::basename(filename) << ":" << line << "\n";
+            this->send(cmd.str());
+            o = this->getResponseBlk();
+
+            if(o && o->t == GDB_TYPE_RESULT_RECORD && o->cl == GDB_CLASS_DONE)
+            {
+                this->addOrUpdateBreakpoint(o);
+                this->freeOutput(o);
+            }
         }
     }
-    
-
-
 }
 
 void GDB::breakDelete(const std::string &number)
@@ -1382,4 +1382,9 @@ std::vector<std::string> GDB::complete(std::string command)
         this->freeOutput(o);
     }
     return completionList;
+}
+
+void GDB::setVerbose()
+{
+    m_logger.setLogLevel(Logger::LOG_LEVEL_ERROR | Logger::LOG_LEVEL_INFO | Logger::LOG_LEVEL_WARNING);
 }
