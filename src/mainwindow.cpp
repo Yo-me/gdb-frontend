@@ -9,11 +9,32 @@
 void MainWindow::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     ImGuiIO &io = ImGui::GetIO();
-    if(!io.WantCaptureKeyboard)
+    MainWindow *mainWindow = static_cast<MainWindow *>(glfwGetWindowUserPointer(window));
+    if(mainWindow->m_gdb->getState() == GDB_STATE_STOPPED)
     {
-    }
-    else
-    {
+        if(action == GLFW_PRESS)
+        {
+            switch(key)
+            {
+                case GLFW_KEY_F10:
+                    mainWindow->m_gdb->next();
+                    break;
+                case GLFW_KEY_F11:
+                    if(mods & GLFW_MOD_SHIFT)
+                    {
+                        mainWindow->m_gdb->finish();
+                    }
+                    else
+                    {
+                        mainWindow->m_gdb->step();
+                    }
+                    break;
+                case GLFW_KEY_F5:
+                    mainWindow->m_gdb->resume();
+                    break;
+            }
+        }
+        
     }
     ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
 }
