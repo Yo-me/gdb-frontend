@@ -2,6 +2,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <functional>
 
 SourceWindow::SourceWindow(GDB *gdb)
     :m_gdb(gdb), m_currentSourceLine(-1), m_executableLines(NULL), m_isFocused(false)

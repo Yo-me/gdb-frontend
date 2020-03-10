@@ -183,7 +183,7 @@ void GDB::computeFrameStack()
                 }
                 else
                 {
-                    frameStruct.line = 0;
+                    frameStruct.line = -1;
                 }
                 
                 frameStruct.level = stoi(frame->mp["level"]->cstr);
@@ -1004,7 +1004,7 @@ void GDB::retrieveVariableObjectChildren(GDBVariableObject &var)
 {
     if(this->m_state == GDB_STATE_STOPPED)
     {
-        std::string cmd = "-var-list-children --simple-values " + var.name + "\n";
+        std::string cmd = "-var-list-children --simple-values \"" + var.name + "\"\n";
 
         this->send(cmd);
         GDBOutput *childrenOutput = this->getResponseBlk();

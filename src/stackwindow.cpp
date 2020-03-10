@@ -33,6 +33,7 @@ void StackWindow::draw(void)
                 func += ")";
                 if(ImGui::Selectable(func.c_str(), frame.level == currentFrameLevel && this->m_gdb->getCurrentThread() == threadFrame.first))
                 {
+                    this->m_gdb->setCurrentThread(threadFrame.first);
                     this->m_gdb->setCurrentFrameLevel(frame.level);
                 }
             }
