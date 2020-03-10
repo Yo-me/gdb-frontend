@@ -8,9 +8,9 @@
 GDBConsole::GDBConsole(GDB *gdb)
     :m_gdb(gdb),
     m_stream(*gdb->getConsoleStream()),
-    m_scrollToBottom(0),
     m_currentCommandIndex(-1),
-    m_isActive(false)
+    m_isActive(false),
+    m_consoleTextLength(0)
 {
 
 }
@@ -77,17 +77,18 @@ void GDBConsole::draw()
 {
     if(ImGui::Begin("Console", NULL, ImGuiWindowFlags_NoCollapse))
     {
-        const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing(); // 1 separator, 1 input text
+        const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing(); // 1 separator 1 input text
+        int currentTextLength = this->m_stream.str().length();
         char command[1024] = "\0";
         bool reclaimFocus = false;
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0, 0.0));
         ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar); // Leave room for 1 separator + 1 InputText
         ImGui::TextUnformatted(this->m_stream.str().c_str());
-        if(this->m_scrollToBottom)
+        if(this->m_consoleTextLength != currentTextLength)
         {
-            ImGui::SetScrollHere(1.0);
-            this->m_scrollToBottom--;
+            ImGui::SetScrollHereY(1.0);
         }
+        this->m_consoleTextLength = currentTextLength;
         ImGui::EndChild();
         ImGui::PopStyleVar();
         ImGui::Separator();
@@ -113,16 +114,13 @@ void GDBConsole::draw()
             this->m_gdb->sendCLI(cmd.c_str());
             command[0] = 0;
             reclaimFocus = true;
-            this->m_scrollToBottom = 2;
             this->m_currentCommandIndex = -1;
         }
-
         ImGui::PopItemWidth();
         // Demonstrate keeping focus on the input box
         ImGui::SetItemDefaultFocus();
         if (reclaimFocus)
             ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
-        m_isActive = ImGui::IsItemActive();
     }
     ImGui::End();
 }
